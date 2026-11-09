@@ -1,0 +1,11 @@
+﻿experiment,script,files,rows,check,note
+S1,s1_driver.py,s1_baseline.csv(2160),2160,,主基准梯度训练（12股x3horizon，run级）
+S2,s2_driver.py,s2_results.csv(1200),1200,,编码对比（run级）
+S3,s3_features.py,m1_baseline.csv(1800),1800,,特征消融（run级）
+B1-ARIMA,b1_arima.py,000333.csv(15); 002415.csv(15); 300274.csv(15); 300308.csv(15); 300750.csv(15); 600031.csv(15); 600036.csv(15); 600276.csv(15); 600519.csv(15); 600887.csv(15); 600900.csv(15); 688981.csv(15),180,,ARIMA对照（12股x15）
+B1-Adam,b1_adam.py,000333.csv(75); 002415.csv(75); 300274.csv(75); 300308.csv(75); 300750.csv(75); 600031.csv(75); 600036.csv(75); 600276.csv(75); 600519.csv(75); 600887.csv(75); 600900.csv(75); 688981.csv(75),900,,Adam-only对照（12股x75）
+S5-E1,s5_e1.py + s5_e1_win400.py,s5_e1.csv(290); s5_e1_win400.csv(140),430,,lambda敏感性（290+140）
+S5-E2-main,s5_e3.py,s5_e3.csv(160); s5_e3_fill.csv(40),200,,合成控制主运行（160+40补跑）
+S5-E2-controls,run_controls_pool.py,s5_e3_controls.csv(180),180,,广初始化/随机搜索/无信号/记忆长度对照
+S5-E3-budget,s5_e3_budget_curve.py + run_budget_curve.py,s5_e3_budget_curve.csv(60),60,,三档预算权重探针
+S5-E2-multiseed,run_multiseed.py,s5_e3_multiseed.csv(520),520,,E2主+无信号+记忆长度对照在生成种子1/2上的复现（260×2）

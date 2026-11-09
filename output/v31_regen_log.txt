@@ -1,0 +1,211 @@
+{
+ "S1_curve_med_of_mean": {
+  "+10d": 1.3084,
+  "+1d": 2.3215,
+  "+20d": 1.2132,
+  "+3d": 1.6381,
+  "+40d": 1.243,
+  "+5d": 1.4166
+ },
+ "S1_curve_med_of_med": {
+  "+10d": 1.132,
+  "+1d": 1.6752,
+  "+20d": 1.0916,
+  "+3d": 1.2558,
+  "+40d": 1.0209,
+  "+5d": 1.1784
+ },
+ "below1_40d_med": 6,
+ "below1_40d_mean": 0,
+ "closest_mean_40d": {
+  "stock": 600276,
+  "value": 1.0412
+ },
+ "T3_price_medofmean": {
+  "+1d": 2.3215,
+  "+20d": 1.2132,
+  "+5d": 1.4166
+ },
+ "T3_price_medofmed": {
+  "+1d": 1.6752,
+  "+20d": 1.0916,
+  "+5d": 1.1784
+ },
+ "T3_adam_medofmean": {
+  "+1d": 6.2011,
+  "+20d": 1.7682,
+  "+5d": 3.0426
+ },
+ "T3_adam_medofmed": {
+  "+1d": 4.6308,
+  "+20d": 1.5125,
+  "+5d": 2.5092
+ },
+ "T3_tech_medofmean": {
+  "+1d": 4.1143,
+  "+20d": 1.4445,
+  "+5d": 2.098
+ },
+ "T3_tech_medofmed": {
+  "+1d": 3.4536,
+  "+20d": 1.2936,
+  "+5d": 1.6986
+ },
+ "T3_sent_medofmean": {
+  "+1d": 4.2046,
+  "+20d": 1.4602,
+  "+5d": 2.0972
+ },
+ "T3_sent_medofmed": {
+  "+1d": 2.9178,
+  "+20d": 1.2293,
+  "+5d": 1.6412
+ },
+ "T3_arima_stockmean": {
+  "+1d": 1.0025,
+  "+5d": 1.007,
+  "+20d": 1.0259
+ },
+ "T3_arima_stockmedian": {
+  "+1d": 1.0015,
+  "+5d": 1.0048,
+  "+20d": 1.0168
+ },
+ "tech_beats_price_cells": {
+  "+1d": 0,
+  "+20d": 0,
+  "+5d": 0
+ },
+ "sent_beats_price_cells": {
+  "+1d": 0,
+  "+20d": 0,
+  "+5d": 0
+ },
+ "S3_family": {
+  "tech vs price +1d": {
+   "wins_feat": 0,
+   "n": 12,
+   "median_ratio_feat": 3.4536,
+   "p": 0.000488
+  },
+  "tech vs price +5d": {
+   "wins_feat": 0,
+   "n": 12,
+   "median_ratio_feat": 1.6986,
+   "p": 0.000488
+  },
+  "tech vs price +20d": {
+   "wins_feat": 0,
+   "n": 12,
+   "median_ratio_feat": 1.2936,
+   "p": 0.000488
+  },
+  "sent vs price +1d": {
+   "wins_feat": 0,
+   "n": 12,
+   "median_ratio_feat": 2.9178,
+   "p": 0.000488
+  },
+  "sent vs price +5d": {
+   "wins_feat": 1,
+   "n": 12,
+   "median_ratio_feat": 1.6412,
+   "p": 0.000977
+  },
+  "sent vs price +20d": {
+   "wins_feat": 1,
+   "n": 12,
+   "median_ratio_feat": 1.2293,
+   "p": 0.000977
+  }
+ },
+ "S2_med_of_mean": {
+  "+10d": {
+   "Fixed-APSO": 1.3084,
+   "Staged-PSO": 1.4792,
+   "Unified-PSO": 1.4676
+  },
+  "+5d": {
+   "Fixed-APSO": 1.4166,
+   "Staged-PSO": 1.9565,
+   "Unified-PSO": 1.6578
+  }
+ },
+ "S2_med_of_median": {
+  "+10d": {
+   "Fixed-APSO": 1.132,
+   "Staged-PSO": 1.1654,
+   "Unified-PSO": 1.1984
+  },
+  "+5d": {
+   "Fixed-APSO": 1.1784,
+   "Staged-PSO": 1.2583,
+   "Unified-PSO": 1.2972
+  }
+ },
+ "S2_pairs": {
+  "Fixed-APSO vs Staged-PSO": {
+   "+5d": {
+    "wins_a": 7,
+    "n": 12,
+    "median_diff": -0.014,
+    "p": 0.203613
+   },
+   "+10d": {
+    "wins_a": 8,
+    "n": 12,
+    "median_diff": -0.0159,
+    "p": 0.203613
+   }
+  },
+  "Fixed-APSO vs Unified-PSO": {
+   "+5d": {
+    "wins_a": 10,
+    "n": 12,
+    "median_diff": -0.1119,
+    "p": 0.002441
+   },
+   "+10d": {
+    "wins_a": 11,
+    "n": 12,
+    "median_diff": -0.0855,
+    "p": 0.001465
+   }
+  },
+  "Staged-PSO vs Unified-PSO": {
+   "+5d": {
+    "wins_a": 9,
+    "n": 12,
+    "median_diff": -0.0894,
+    "p": 0.063965
+   },
+   "+10d": {
+    "wins_a": 9,
+    "n": 12,
+    "median_diff": -0.0529,
+    "p": 0.077148
+   }
+  }
+ },
+ "S2_arch": {
+  "Unified-PSO": {
+   "hidden_dist": {
+    "16": 287,
+    "32": 313
+   },
+   "seq_median": 36.0,
+   "seq_min": 14,
+   "seq_max": 60
+  },
+  "Staged-PSO": {
+   "hidden_dist": {
+    "8": 95,
+    "16": 314,
+    "32": 191
+   },
+   "seq_median": 35.0,
+   "seq_min": 10,
+   "seq_max": 60
+  }
+ }
+}

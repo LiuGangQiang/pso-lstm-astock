@@ -1,0 +1,44 @@
+  PSO iter 1/20  gbest MSE=0.150855
+  PSO iter 2/20  gbest MSE=0.070630
+  PSO iter 3/20  gbest MSE=0.021793
+  PSO iter 4/20  gbest MSE=0.019594
+  PSO iter 5/20  gbest MSE=0.019594
+  PSO iter 6/20  gbest MSE=0.019142
+  PSO iter 7/20  gbest MSE=0.019142
+  PSO iter 8/20  gbest MSE=0.019142
+  PSO iter 9/20  gbest MSE=0.018837
+  PSO iter 10/20  gbest MSE=0.018837
+  PSO iter 11/20  gbest MSE=0.018534
+  PSO iter 12/20  gbest MSE=0.018534
+  PSO iter 13/20  gbest MSE=0.018534
+  PSO iter 14/20  gbest MSE=0.018534
+  PSO iter 15/20  gbest MSE=0.018534
+  PSO iter 16/20  gbest MSE=0.018534
+  PSO iter 17/20  gbest MSE=0.018534
+  PSO iter 18/20  gbest MSE=0.018534
+  PSO iter 19/20  gbest MSE=0.018534
+  PSO iter 20/20  gbest MSE=0.018534
+{'control': 'wide_init', 'r': 0.2, 'lam': 0.1, 'seed': 13, 'mem': 40, 'chosen_seq': 58, 'chosen_hidden': 32, 'gbest_fit': 0.01853366719611641, 'init_seq_med': 29.0, 'init_hid_med': 32.0}
+
+  PSO iter 1/20  gbest MSE=0.150855
+  PSO iter 2/20  gbest MSE=0.070630
+  PSO iter 3/20  gbest MSE=0.021793
+  PSO iter 4/20  gbest MSE=0.019594
+  PSO iter 5/20  gbest MSE=0.019594
+  PSO iter 6/20  gbest MSE=0.019142
+  PSO iter 7/20  gbest MSE=0.019142
+  PSO iter 8/20  gbest MSE=0.019142
+  PSO iter 9/20  gbest MSE=0.018837
+  PSO iter 10/20  gbest MSE=0.018837
+  PSO iter 11/20  gbest MSE=0.018534
+  PSO iter 12/20  gbest MSE=0.018534
+  PSO iter 13/20  gbest MSE=0.018534
+  PSO iter 14/20  gbest MSE=0.018534
+  PSO iter 15/20  gbest MSE=0.018534
+  PSO iter 16/20  gbest MSE=0.018534
+  PSO iter 17/20  gbest MSE=0.018534
+  PSO iter 18/20  gbest MSE=0.018534
+  PSO iter 19/20  gbest MSE=0.018534
+  PSO iter 20/20  gbest MSE=0.018534
+{'control': 'wide_init', 'r': 0.2, 'lam': 0.1, 'seed': 13, 'mem': 40, 'chosen_seq': 58, 'chosen_hidden': 32, 'gbest_fit': 0.01853366719611641, 'init_seq_med': 29.0, 'init_hid_med': 32.0}
+

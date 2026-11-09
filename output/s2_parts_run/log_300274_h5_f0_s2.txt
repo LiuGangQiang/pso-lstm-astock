@@ -1,0 +1,23 @@
+  PSO iter 1/20  gbest MSE=0.026632
+  PSO iter 2/20  gbest MSE=0.021227
+  PSO iter 3/20  gbest MSE=0.021227
+  PSO iter 4/20  gbest MSE=0.020478
+  PSO iter 5/20  gbest MSE=0.020149
+  PSO iter 6/20  gbest MSE=0.019421
+  PSO iter 7/20  gbest MSE=0.019421
+  PSO iter 8/20  gbest MSE=0.018534
+  PSO iter 9/20  gbest MSE=0.018534
+  PSO iter 10/20  gbest MSE=0.017793
+  PSO iter 11/20  gbest MSE=0.015839
+  PSO iter 12/20  gbest MSE=0.013589
+  PSO iter 13/20  gbest MSE=0.011500
+  PSO iter 14/20  gbest MSE=0.010371
+  PSO iter 15/20  gbest MSE=0.010109
+  PSO iter 16/20  gbest MSE=0.009995
+  PSO iter 17/20  gbest MSE=0.009726
+  PSO iter 18/20  gbest MSE=0.009582
+  PSO iter 19/20  gbest MSE=0.009582
+  PSO iter 20/20  gbest MSE=0.009582
+300274_h5_f0_s2 Unified-PSO s36,h16 RMSE=331.19
+300274_h5_f0_s2 Staged-PSO s25,h8 RMSE=558.26
+300274_h5_f0_s2 OK
