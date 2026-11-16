@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-"""E1 离散度比较的区组置换检验（编辑清单第 6 项 / 复核 c10）。
+"""E1 Block permutation test for dispersion comparison (Item 6 of the editing checklist / Review c10).
 
-设计：同一 seed 在 λ=0 与最大测试 λ 之间共享初始化与 600 子采样流，
-样本为配对而非独立。对四个面板（恒瑞/招行 × 全样本/400 天窗口）以
-seed 为区组，在区组内交换 λ 标签，重算与正文一致的 Levene 统计量
-（均值的绝对偏差，双组），得到校准置换 p 值。
+Design: The same seed shares the initialization and 600 subsampling streams between λ=0 and the maximum test λ,
+The samples are paired rather than independent. For the four panels (Hengrui/China Merchants Bank × full sample/400-day window),
+with seed as the block, exchange the λ labels within the block, and recalculate the Levene statistic consistent with the main text
+(absolute deviation of the mean, two groups) to obtain the calibrated permutation p-value.
 
-零假设：区组内两 λ 标签可交换（强于"仅离散度相等"的保守零假设）。
-统计量与正文 nominal Levene 一致，便于直接替换口径。
-B=200,000 次 Monte Carlo 置换，rng seed 0。
-"""
+Null hypothesis: The two λ labels within the block are interchangeable (stronger than the conservative null hypothesis of "equal dispersion only").
+The statistic is consistent with the nominal Levene in the main text, making it easy to directly replace the criteria.
+B = 200,000 Monte Carlo permutations, rng seed 0."""
 import numpy as np
 import pandas as pd
 
@@ -23,8 +22,8 @@ HR, CMB = 600276, 600036
 
 
 def levene_W(x, y):
-    """双组 Brown–Forsythe 统计量（deviations from group medians），
-    与 scipy levene(center='median') 一致（正文 nominal p 值口径）。"""
+    """Two-group Brown–Forsythe statistic (deviations from group medians),
+    Consistent with scipy levene(center='median') (nominal p-value standard in the main text)."""
     zx = np.abs(x - np.median(x))
     zy = np.abs(y - np.median(y))
     n1, n2 = len(zx), len(zy)
@@ -37,7 +36,7 @@ def levene_W(x, y):
 
 
 def block_permutation(a, b, B=B, rng=RNG):
-    """区组内置换：每个 seed 对以 1/2 概率交换标签，重算 Levene W。"""
+    """Block-wise permutation: Each seed pair exchanges labels with a probability of 1/2, and Levene's W is recalculated."""
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
     W_obs = levene_W(a, b)
@@ -63,7 +62,7 @@ def panel(df, stock, lams, label, win_size=None):
     a = d0.loc[common].values
     b = d1.loc[common].values
     W_obs, p_perm = block_permutation(a, b)
-    # nominal（把配对样本当独立组）p 值，供对照
+    # Nominal (treating paired samples as independent groups) p-value for comparison
     from scipy import stats
     W_nom, p_nom = stats.levene(a, b, center='median')
     sd0, sd1 = a.std(ddof=1), b.std(ddof=1)

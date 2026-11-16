@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
-"""PSO × LSTM 核心库。
+"""PSO × LSTM core library.
 
-融合论文 02 与论文 12 两条技术路线：
-- 路线 A（论文 02）：PSO 搜索 LSTM 超参数/架构/序列长度；
-- 路线 B（论文 12）：自适应 PSO 演化 LSTM + 全连接层的初始权重，再由 Adam 精调。
+Combining the two technical approaches from Paper 02 and Paper 12:
+- Route A (Paper 02): PSO searches for LSTM hyperparameters/architecture/sequence length;
+- Route B (Paper 12): Adaptive PSO evolves the initial weights of the LSTM + fully connected layer, which are then fine-tuned by Adam.
 
-自适应惯性权重（论文 12 式 12）：
+Adaptive inertia weight (Paper 12, Equation 12):
     x_t^i = xmax - (xmax - xmin) * (V_gbest^t / V_pbest_i^t)
-即按全局最优粒子与个人最优粒子的速度之比，为每个粒子动态分配惯性权重。
-"""
+That is, the inertia weight is dynamically assigned to each particle based on the ratio of the velocity of the global best particle to that of the personal best particle."""
 import math
 
 import numpy as np
 import torch
 import torch.nn as nn
 
-# ---------------- LSTM 网络 ----------------
+# ---------------- LSTM Network ----------------
 
 class LSTMRegressor(nn.Module):
-    """单隐藏层 LSTM + 全连接输出层，对应论文 12 的 LSTM+FCL 结构。"""
+    """Single hidden layer LSTM + fully connected output layer, corresponding to the LSTM + fully connected layer structure in Paper 12."""
 
     def __init__(self, n_features: int = 1, hidden: int = 32, n_layers: int = 1):
         super().__init__()
@@ -31,7 +30,7 @@ class LSTMRegressor(nn.Module):
         out, _ = self.lstm(x)
         return self.head(out[:, -1, :]).squeeze(-1)
 
-    # ---- 粒子（权重向量）<-> 网络参数 的双向映射（论文 12 的编码方案） ----
+    # ---- Bidirectional mapping between particles (weight vectors) <-> network parameters (encoding scheme from Paper 12) ----
     def get_vector(self) -> np.ndarray:
         parts = []
         for p in self.lstm.parameters():
@@ -55,7 +54,7 @@ class LSTMRegressor(nn.Module):
 
 
 def init_weights_paper12(model: LSTMRegressor, n_features: int, seed: int = 0):
-    """论文 12 的初始化：输入权重 Glorot，循环权重正交，偏置置零。"""
+    """Initialization from Paper 12: Glorot input weights, orthogonal recurrent weights, and zero biases."""
     g = torch.Generator().manual_seed(seed)
     with torch.no_grad():
         for layer in model.lstm._all_weights:
@@ -74,10 +73,10 @@ def init_weights_paper12(model: LSTMRegressor, n_features: int, seed: int = 0):
             p.zero_() if p.dim() == 1 else p.uniform_(-0.05, 0.05, generator=g)
 
 
-# ---------------- 数据序列构造 ----------------
+# ---------------- Data Sequence Construction ----------------
 
 def make_sequences(series: np.ndarray, seq_len: int, horizon: int = 1):
-    """滑动窗口序列化。返回 x [N, seq_len, 1], y [N]。"""
+    """Construct sliding-window sequences. Returns x [N, seq_len, 1] and y [N]."""
     x, y = [], []
     for i in range(seq_len, len(series) - horizon + 1):
         x.append(series[i - seq_len:i])
@@ -87,9 +86,9 @@ def make_sequences(series: np.ndarray, seq_len: int, horizon: int = 1):
 
 def make_sequences_multi(feat: np.ndarray, target: np.ndarray, seq_len: int,
                          horizon: int = 1):
-    """多变量滑动窗口序列化（S3 特征消融）。
-    feat [T, F] 多特征输入（已按训练折缩放），target [T] 缩放后的 close。
-    返回 x [N, seq_len, F], y [N]（target 在 t+horizon-1 处的值）。
+    """Multivariate sliding-window sequence construction (S3 feature ablation).
+    feat [T, F]: multivariate inputs scaled within each training fold; target [T]: scaled close prices.
+    Returns x [N, seq_len, F] and y [N], where the target is at t+horizon-1.
     """
     x, y = [], []
     for i in range(seq_len, len(feat) - horizon + 1):
@@ -100,7 +99,7 @@ def make_sequences_multi(feat: np.ndarray, target: np.ndarray, seq_len: int,
 
 def train_model(model: LSTMRegressor, x, y, epochs: int, lr: float = 0.01,
                 seed: int = 0, verbose: bool = False) -> float:
-    """Adam 训练，返回训练集 MSE。对应论文 12 的第二阶段（局部搜索）。"""
+    """Adam training, returns the training set MSE. Corresponds to the second stage (local search) of Paper 12."""
     torch.manual_seed(seed)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
@@ -121,10 +120,10 @@ def eval_mse(model: LSTMRegressor, x, y) -> float:
     return float(torch.mean((pred - torch.from_numpy(y)) ** 2).item())
 
 
-# ---------------- PSO 基类 ----------------
+# ---------------- PSO Base Class ----------------
 
 class PSO:
-    """标准 PSO + 论文 12 的自适应惯性权重选项。"""
+    """Standard PSO with the optional adaptive inertia weight from Paper 12."""
 
     def __init__(self, dim, n_particles=20, iters=30, w_max=0.9, w_min=0.4,
                  c1=1.5, c2=1.5, adaptive=False, seed=0, verbose=True):
@@ -147,7 +146,7 @@ class PSO:
     def _inertia(self) -> np.ndarray:
         if not self.adaptive:
             return np.full(self.n, self.w_max)
-        # 论文 12 式(12)：按 |V_gbest| / |V_pbest_i| 比值自适应（逐粒子）
+        # Paper 12 Equation (12): Adaptive according to the ratio |V_gbest| / |V_pbest_i| (particle-by-particle)
         v_g = np.linalg.norm(self.vel[self.pbest_fit.argmin()]) if self.gbest is not None else 1.0
         ratio = v_g / (np.linalg.norm(self.vel, axis=1) + 1e-12)
         ratio = np.clip(ratio, 0.0, 1.0)
@@ -177,21 +176,21 @@ class PSO:
         return self.gbest, self.gbest_fit
 
 
-# ---------------- 路线 A：PSO 调超参数/序列长度（论文 02 的精简版） ----------------
+# ---------------- Route A: PSO Hyperparameter/Sequence Length Tuning (Condensed Version of Paper 02) ----------------
 
-# 搜索维度：[seq_len, hidden, epochs]
+# Search Dimensions: [seq_len, hidden, epochs]
 BOUNDS = np.array([[10, 60], [8, 64], [10, 60]], dtype=float)  # (low, high) per dim
 ALLOWED_HIDDEN = np.array([8, 16, 32, 64])
 
 
 def decode_struct(v_seq: float, v_hid: float, seq_bounds, hidden_list):
-    """结构坐标归一化映射（V3.2 复核 c0 修复）。
+    """Normalized mapping of structural coordinates (V3.2 review fix c0).
 
-    PSO 位置被钳位在 [-5, 5]，结构坐标必须先归一化再解码，否则整个可达
-    区间只能解码出 seq_bounds 下界与 hidden_list 最小值（归档 V2 及之前
-    的 S2/E2 因此恒为 s10,h8，属实现 artifact）。
-      seq:  [-5,5] 线性映射到 [seq_lo, seq_hi]（整数格点）
-      hid:  [-5,5] 均分为 len(hidden_list) 段，取段内索引
+    PSO positions are clipped to [-5, 5]. Structural coordinates must be normalized before decoding; otherwise,
+    the entire reachable interval decodes only to the lower seq_bounds and smallest hidden_list value, as in the
+    superseded S2/E2 archives (V2 and earlier always produced s10,h8 because of this implementation artifact).
+      seq: linearly map [-5,5] to integer grid points in [seq_lo, seq_hi]
+      hid: divide [-5,5] into len(hidden_list) equal intervals and select the corresponding index
     """
     lo, hi = seq_bounds
     seq_len = int(np.clip(lo + round((float(v_seq) + 5.0) / 10.0 * (hi - lo)),
@@ -208,36 +207,36 @@ def decode_hyper(vec) -> tuple:
 
 
 def pso_hyper_search(train_close, n_particles=12, iters=15, seed=0, horizon=1) -> tuple:
-    """每个粒子编码 (seq_len, hidden, epochs)，适应度 = 该配置 LSTM 的训练 MSE。"""
+    """Each particle encodes (seq_len, hidden, epochs); fitness is the training MSE of the corresponding LSTM."""
     pso = PSO(dim=3, n_particles=n_particles, iters=iters, adaptive=False, seed=seed)
 
     def fitness(vec):
         seq_len, hidden, epochs = decode_hyper(vec)
         x, y = make_sequences(train_close, seq_len, horizon)
         model = LSTMRegressor(hidden=hidden)
-        mse = train_model(model, x, y, epochs=max(5, epochs // 4), seed=seed)  # 搜索期用较少 epoch 加速
+        mse = train_model(model, x, y, epochs=max(5, epochs // 4), seed=seed)  # Accelerate the search period with fewer epochs
         return mse
 
     best, fit = pso.run(fitness)
     return decode_hyper(best), fit, pso.history
 
 
-# ---------------- 路线 B：自适应 PSO 演化初始权重（论文 12） ----------------
+# ---------------- Route B: Adaptive PSO Evolution Initial Weights (Paper 12) ----------------
 
 def apso_weight_search(train_close, seq_len=20, hidden=16, n_particles=15,
                        iters=20, seed=0, horizon=1, verbose=True,
                        val_close=None, fitness_mode="train",
                        weight_penalty=0.0, fitness_subsample=0,
                        n_features=1) -> tuple:
-    """粒子 = LSTM+FCL 的全部权重偏置；自适应惯性权重；适应度 = 前向 MSE。
+    """A particle contains all LSTM+FCL weights and biases; inertia is adaptive; fitness is forward-pass MSE.
 
-    val_close（V1.3）：若给定，适应度在训练段内部的时序验证切片上前向计算，
-    而非全训练段——防止大预算把训练 MSE 压进测试期爆炸的极端权重区（适应度过拟合）。
-    fitness_mode："train"（默认）/ "val"（需 val_close）/ "composite"（0.5 训练 + 0.5 验证）。
-    weight_penalty：权重范数惩罚系数 λ，适应度 += λ · mean(vec²)，封死极端权重区。
-    fitness_subsample：PSO 阶段适应度的序列子采样数（0 = 全量；>0 时按种子固定抽取，
-    属多保真度评估的搜索阶段加速，不改变最终 Adam 精调数据）。
-    n_features：输入特征数（S3 特征消融；train_close 为多变量时传入 feat [T, F]）。
+    val_close (V1.3): if supplied, evaluate fitness on a chronological validation slice within the training segment
+    rather than the full training segment to discourage extreme weights that overfit the fitness objective.
+    fitness_mode: 'train' (default), 'val' (requires val_close), or 'composite' (0.5 training + 0.5 validation).
+    weight_penalty: coefficient λ for the weight-norm penalty; fitness += λ·mean(vec²) to penalize extreme weights.
+    fitness_subsample: number of sequences sampled for PSO fitness (0 = all; >0 uses a seed-fixed sample),
+    providing multi-fidelity search acceleration without changing the final Adam fine-tuning data.
+    n_features: number of input features (for S3 ablation, pass feat [T, F] as train_close).
     """
     if n_features > 1:
         x, y = make_sequences_multi(train_close, train_close[:, 0], seq_len, horizon)
@@ -274,37 +273,37 @@ def apso_weight_search(train_close, seq_len=20, hidden=16, n_particles=15,
     return best, fit, pso.history
 
 
-# ---------------- 路线 C：统一编码（架构段 + 权重段同粒子，本研究的创新点） ----------------
+# ---------------- Route C: Unified Encoding (Architecture Segment + Weight Segment as Particles, the Innovative Aspect of This Study) ----------------
 
 UNI_HIDDEN = np.array([8, 16, 32, 64])
 UNI_SEQ_BOUNDS = (10, 60)
 
 
 def _weight_dim(hidden: int, n_features: int = 1) -> int:
-    """LSTM+FCL 的权重向量维度：4H(N+H) + 8H（两个偏置）+ H + 1。"""
+    """Weight vector dimensions for LSTM+FCL: 4H(N+H) + 8H (two biases) + H + 1."""
     return 4 * hidden * (n_features + hidden) + 8 * hidden + hidden + 1
 
 
 def unified_pso_search(train_close, n_particles=15, iters=20, seed=0, horizon=1,
                        weight_penalty=0.0, fitness_subsample=0,
                        struct_init=(-1.0, 1.0), init_info=None):
-    """粒子 = [seq_len, hidden, w_1 ... w_Dmax]。
+    """A particle is [seq_len, hidden, w_1 ... w_Dmax].
 
-    架构段决定当前解的网络结构与数据序列长度；权重段按最大架构（hidden=64）填充，
-    评估时只取前 D(hidden) 维注入网络（变长掩码编码）。
-    适应度 = 该（架构, 权重）组合的前向训练 MSE。
-    weight_penalty / fitness_subsample 与 apso_weight_search 同义（V1.4 公平配置）。
-    struct_init：结构段初始采样区间（默认 (-1,1)，与全部历史归档一致；
-      对照实验传 (-5,5) 即广覆盖初始化，用于排除初始化先验，见 s5_e3_controls.py）。
-    init_info：传入 dict 时记录初始群结构解码中位数（排除初始化先验的对照证据）。
+    The architecture segment determines network structure and input sequence length. The weight segment is sized for
+    the largest architecture (hidden=64); only the first D(hidden) dimensions are injected during evaluation
+    (variable-length mask encoding). Fitness is forward training MSE for the (architecture, weights) combination.
+    weight_penalty and fitness_subsample have the same meanings as in apso_weight_search (V1.4 fair configuration).
+    struct_init: initial sampling interval for structural coordinates (default (-1,1), matching historical archives;
+      controls use (-5,5) for broad initialization to rule out initialization priors; see s5_e3_controls.py).
+    init_info: when a dict is supplied, record median decoded structures in the initial swarm.
     """
     d_max = _weight_dim(int(UNI_HIDDEN.max()))
     dim = 2 + d_max
     pso = PSO(dim=dim, n_particles=n_particles, iters=iters, adaptive=True, seed=seed)
 
-    # 结构段重初始化（仅在对照实验显式传入非默认区间时生效；
-    # 默认路径逐位保持与历史归档一致）。用独立于 PSO 内部 rng 的流，
-    # 避免扰动默认路径的随机序列。
+    # Reinitialization of structure segments (only effective when non-default intervals are explicitly passed in the control experiment;
+    # The default path remains bit-for-bit consistent with the historical archive). Using a stream independent of the RNG within the PSO,
+    # Avoid perturbing the random sequence of the default path.
     if tuple(struct_init) != (-1.0, 1.0):
         lo_s, hi_s = struct_init
         s_rng = np.random.default_rng(seed + 777)
@@ -315,9 +314,9 @@ def unified_pso_search(train_close, n_particles=15, iters=20, seed=0, horizon=1,
         init_info["init_seq_med"] = float(np.median([d[0] for d in dec]))
         init_info["init_hid_med"] = float(np.median([d[1] for d in dec]))
 
-    # 权重段不用均匀随机初始化，而是按论文 12 的 Glorot/正交方案初始化每个粒子
-    # （以最大架构 h64 生成，评估时按实际架构截取前 D(hidden) 维），
-    # 避免大网络因随机起点太差而在联合搜索中被系统性淘汰。
+    # Instead of initializing the weight segments uniformly at random, each particle is initialized according to the Glorot/orthogonal scheme in Paper 12.
+    # (Generated with the maximum architecture h64, and during evaluation, the first D(hidden) dimensions are taken according to the actual architecture),
+    # Avoids large networks from being systematically eliminated in joint searches due to poor random starting points.
     for i in range(n_particles):
         probe = LSTMRegressor(hidden=int(UNI_HIDDEN.max()))
         init_weights_paper12(probe, n_features=1, seed=seed * 1000 + i)
@@ -350,7 +349,7 @@ def unified_pso_search(train_close, n_particles=15, iters=20, seed=0, horizon=1,
     return best, fit, pso.history, decode
 
 
-# ---------------- 路线 C2：分阶段联合编码（V1.2 起 M3 的创新点实现） ----------------
+# ---------------- Route C2: Phased Joint Encoding (Implementation of M3 Innovations from V1.2 onwards) ----------------
 
 STAGE_HIDDEN = np.array([8, 16, 32, 64])
 STAGE_SEQ_BOUNDS = (10, 60)
@@ -359,13 +358,12 @@ STAGE_SEQ_BOUNDS = (10, 60)
 def staged_pso_search(train_close, outer_particles=12, outer_iters=10, seed=0, horizon=1,
                       inner_particles=10, inner_iters=8, weight_penalty=0.1,
                       fitness_subsample=600, verbose=True):
-    """分阶段联合编码：外层 PSO 只搜离散结构 (seq_len, hidden)，
-    内层以小型 APSO（少量粒子×代数 + 惩罚 + 子采样）为该结构优化权重，
-    外层适应度 = 内层最优权重在全训练段上的前向 MSE（含惩罚项）。
+    """Staged joint encoding: The outer-layer PSO only searches for discrete structures (seq_len, hidden),
+    The inner layer uses a small APSO (small number of particles × generations + penalty + subsampling) to optimize the weights for this structure.
+    Outer-layer fitness = the forward MSE of the inner-layer optimal weights over the entire training segment (including the penalty term).
 
-    相比朴素统一编码（17k 维权重段与 2 维结构段同粒子），搜索空间从
-    D_max+2 维降到 2 维，结构维度信号不再被权重噪声淹没（对应 RQ2/H3）。
-    """
+    Compared to the naive unified encoding (17k-dimensional weight segment and 2-dimensional structure segment with the same particles), the search space is reduced from
+    D_max+2 to 2 dimensions, and the structural dimensional signal is no longer overwhelmed by weight noise (corresponding to RQ2/H3)."""
     outer = PSO(dim=2, n_particles=outer_particles, iters=outer_iters,
                 adaptive=False, seed=seed, verbose=verbose)
 
@@ -392,7 +390,7 @@ def staged_pso_search(train_close, outer_particles=12, outer_iters=10, seed=0, h
     return best, fit, outer.history, decode
 
 
-# ---------------- 评价指标（论文 12 五指标 + 论文 02 两项） ----------------
+# ---------------- Evaluation Metrics (Paper 12: Five Metrics + Paper 02: Two Metrics) ----------------
 
 def metrics(actual: np.ndarray, pred: np.ndarray) -> dict:
     a, p = np.asarray(actual, float), np.asarray(pred, float)

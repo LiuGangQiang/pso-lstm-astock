@@ -1,21 +1,19 @@
 # -*- coding: utf-8 -*-
-"""S5-E1：λ 相变实验（机制理论化命题 1/2 的实证先行验证）。
+"""S5-E1: λ phase transition experiment (empirical preliminary validation of mechanism-based theoretical proposition 1/2).
 
-设计：固定恒瑞医药 600276（主，最接近交叉点的标的）/ 招商银行 600036（稳健性），
-h=+5d，生产配置（hidden=16, seq_len=20, 100 粒子 × 50 代, 适应度子采样 600），
-扫描 λ ∈ {0, 0.01, 0.03, 0.05, 0.1, 0.2, 0.5} × 独立种子。
+Design: Fix Jiangsu Hengrui Medicine 600276 (primary, the target closest to the crossover point) / China Merchants Bank 600036 (robustness),
+h=+5d, production configuration (hidden=16, seq_len=20, 100 particles × 50 generations, fitness subsampling 600),
+Scan λ ∈ {0, 0.01, 0.03, 0.05, 0.1, 0.2, 0.5} × independent seeds.
 
-每个 (λ, seed) 运行记录：
-  - 终态群体两两距离中位数（swarm_med_pairdist）——盆地收缩的直接度量
-  - gbest 适应度分解（mse_part / penalty_part / penalty_share）——惩罚主导程度
-  - gbest 权重范数（gbest_norm）
-  - PSO+Adam 全流程后测试集 RMSE 及对 Persistence 比值（ratio）——跨种子一致性的精度口径
-增量写 CSV，可断点续跑。
+Record for each (λ, seed) run:
+  - Median pairwise distance in the final swarm (swarm_med_pairdist) — a direct measure of basin contraction
+  - gbest fitness decomposition (mse_part / penalty_part / penalty_share) — degree of penalty dominance
+  - gbest weight norm (gbest_norm)
+  - RMSE of the test set after the full PSO+Adam process and the ratio relative to Persistence — a measure of precision consistency across seeds
+Incremental writing to CSV, with the ability to checkpoint resume.
 
-用法：
-  python s5_e1.py                 # 跑下一批（时间盒内尽量多跑）
-  python s5_e1.py --stock 600276 --lam 0.1 --seed 0   # 单次测试
-"""
+Usage: python s5_e1.py                 # Run the next batch (run as many as possible within the time budget)
+  python s5_e1.py --stock 600276 --lam 0.1 --seed 0   # Single test"""
 import argparse
 import os
 import time
@@ -59,7 +57,7 @@ def load_close(code: str) -> np.ndarray:
 
 
 def med_pairdist(pos: np.ndarray) -> float:
-    """群体位置两两欧氏距离中位数（抽样 500 对以防 O(n²·d) 过大）。"""
+    """Median pairwise Euclidean distance between swarm positions (sample 500 pairs to limit O(n²·d) cost)."""
     n = pos.shape[0]
     rng = np.random.default_rng(0)
     i, j = rng.integers(0, n, 500), rng.integers(0, n, 500)
@@ -73,7 +71,7 @@ def run_one(code: str, lam: float, seed: int, win: int = 0) -> dict:
     n = len(close)
     split = int(n * (1 - TEST_RATIO))
     tr_raw, te_raw = close[:split], close[split:]
-    if win:  # 短窗机制探针：只用训练段前 win 天拟合缩放器，测试接其后 100 天
+    if win:  # Short window mechanism probe: Only use the scaler fitted to the win days before the training segment, and test the subsequent 100 days.
         tr_raw, te_raw = tr_raw[:win], tr_raw[win:win + 100]
     lo, hi = tr_raw.min(), tr_raw.max()
     scale = lambda v: ((v - lo) / (hi - lo)).astype(np.float32)
@@ -105,13 +103,13 @@ def run_one(code: str, lam: float, seed: int, win: int = 0) -> dict:
     best, fit = pso.run(fitness)
     pso_time = time.time() - t0
 
-    # gbest 适应度分解（用全量训练序列评估 mse 项，与搜索期子采样口径区分）
+    # gbest fitness decomposition (evaluate the mse term using the full training sequence, distinguish from the sub-sampling caliber during the search period)
     gbest_model = LSTMRegressor(hidden=HIDDEN)
     gbest_model.set_vector(best)
     mse_part = eval_mse(gbest_model, x_tr, y_tr)
     pen_part = lam * float(np.mean(best ** 2))
 
-    # Adam 精调（生产配置）
+    # Adam Fine-Tuning (Production Configuration)
     torch.manual_seed(seed)
     t0 = time.time()
     train_model(gbest_model, x_tr, y_tr, epochs=ADAM_EPOCHS, lr=ADAM_LR, seed=seed)
@@ -140,8 +138,8 @@ def main():
     ap.add_argument("--stock")
     ap.add_argument("--lam", type=float)
     ap.add_argument("--seed", type=int)
-    ap.add_argument("--budget", type=float, default=260, help="本批时间预算（秒）")
-    ap.add_argument("--win", type=int, default=0, help="短窗天数（0=全长训练段）")
+    ap.add_argument("--budget", type=float, default=260, help='Time budget for this batch (seconds)')
+    ap.add_argument("--win", type=int, default=0, help='Short-window length in days (0 = full training segment)')
     args = ap.parse_args()
 
     if args.stock and args.lam is not None and args.seed is not None:
@@ -154,20 +152,20 @@ def main():
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path, dtype={"stock": str})
         done = set(zip(df.stock, df.lam, df.seed))
-        print(f"已完成 {len(done)} 组，断点续跑")
+        print(f"Completed {len(done)}Set, resume from breakpoint")
 
     if args.win:
         combos = [("600276", lam, seed) for lam in (0.0, 0.1) for seed in range(30)]
     else:
         combos = all_combos()
     combos = [c for c in combos if c not in done]
-    print(f"剩余 {len(combos)} 组")
+    print(f"Remaining {len(combos)}Group")
     t_start = time.time()
     rows, n_new = [], 0
     for code, lam, seed in combos:
         try:
             row = run_one(code, lam, seed, win=args.win)
-        except Exception as e:  # 单组失败不中断整批
+        except Exception as e:  # Failure of a single group does not interrupt the entire batch
             row = dict(stock=code, horizon=HORIZON, lam=lam, seed=seed, error=str(e))
         rows.append(row)
         n_new += 1
@@ -181,7 +179,7 @@ def main():
         df = pd.DataFrame(rows)
         header = not os.path.exists(csv_path)
         df.to_csv(csv_path, mode="a", index=False, header=header)
-        print(f"本批完成 {len(rows)} 组 -> {csv_path}")
+        print(f"Completed in this batch: {len(rows)}Group{csv_path}")
 
 
 if __name__ == "__main__":

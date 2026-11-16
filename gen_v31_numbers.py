@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""生成 V3.1 修订所需的全部规范数字（单一事实来源）。
+"""Generate all canonical numbers required for the V3.1 revision from a single source of truth.
 
-从运行级归档重算 S1/S2/S3/B2 的所有文稿数字，两种聚合口径并存：
-  med_of_mean: 单元格(25 runs)均值 -> 跨 12 股中位数（现文稿 Table 3 口径）
-  med_of_med : 单元格中位数       -> 跨 12 股中位数（稳健中位口径）
-输出: output/v31_canonical_numbers.json
+Recompute all manuscript values for S1/S2/S3/B2 from run-level archives using two aggregations:
+  med_of_mean: mean within each cell (25 runs) -> median across 12 stocks (Table 3 convention)
+  med_of_med: median within each cell -> median across 12 stocks (robust-median convention)
+Output: output/v31_canonical_numbers.json
 """
 import glob
 import json
@@ -26,8 +26,8 @@ s1 = pd.concat([pd.read_csv(f) for f in glob.glob('output/s1v14_parts/*.csv')],
                ignore_index=True)
 s1['stock'] = norm_stock(s1['stock'])
 
-# 规范 Persistence 分母：必须取实验运行中与 LSTM 共用同一测试窗的实测记录值
-# （run_experiment.py 中 prepare() 同一管线），而非用任意窗口重算。
+# Standardize the Persistence denominator: The actual recorded values from the experimental run that share the same test window as the LSTM must be used.
+# (Same pipeline as prepare() in run_experiment.py), instead of recalculating with an arbitrary window.
 pp = s1[s1['model'] == 'Persistence'][['stock', 'horizon', 'fold', 'RMSE']] \
     .rename(columns={'RMSE': 'pers'})
 
@@ -36,7 +36,7 @@ def ratio_of(df):
     df = df.copy()
     df['stock'] = norm_stock(df['stock'])
     df = df.merge(pp, on=['stock', 'horizon', 'fold'], how='left')
-    assert df['pers'].notna().all(), 'persistence 配对缺失'
+    assert df['pers'].notna().all(), 'Persistence pairing missing'
     df['ratio'] = df['RMSE'] / df['pers']
     return df
 
@@ -86,8 +86,8 @@ for feat in ('tech', 'sent'):
     w = (t < base.reindex(t.index)).groupby('horizon').sum()
     R[f'{feat}_beats_price_cells'] = {k: int(v) for k, v in w.items()}
 
-# V3.2 复核 c2：推断单位统一为股（n=12）。每 (feature × horizon) 的
-# 股级配对 Wilcoxon 族（2×3=6 项，Bonferroni 阈值 0.05/6≈0.0083）。
+# V3.2 Review c2: The inferred unit is standardized as stocks (n=12). Per (feature × horizon)
+# Stock-matched Wilcoxon family (2×3=6 items, Bonferroni threshold 0.05/6≈0.0083).
 R['S3_family'] = {}
 for feat in ('tech', 'sent'):
     for h in ('+1d', '+5d', '+20d'):
@@ -116,8 +116,8 @@ for agg in ('mean', 'median'):
     R[f'S2_med_of_{agg}'] = {h: {m: round(float(t.loc[h, m]), 4)
                                  for m in t.columns} for h in t.index}
 cell = allm.groupby(['stock', 'horizon', 'model'])['ratio'].median().unstack()
-# V3.2 复核 c2：推断单位统一为股（n=12/horizon），分 horizon 成族，
-# 不再用 24 个 股×horizon 格做单次检验（伪重复）。
+# V3.2 review c2: use stocks as the inference units (n=12 per horizon) and treat horizons as families;
+# No longer perform single tests (pseudo-replicates) using 24 strands × horizon grids.
 R['S2_pairs'] = {}
 for a, b in [('Fixed-APSO', 'Staged-PSO'), ('Fixed-APSO', 'Unified-PSO'),
              ('Staged-PSO', 'Unified-PSO')]:
@@ -129,7 +129,7 @@ for a, b in [('Fixed-APSO', 'Staged-PSO'), ('Fixed-APSO', 'Unified-PSO'),
             'wins_a': int((d < 0).sum()), 'n': int(len(d)),
             'median_diff': round(float(d.median()), 4),
             'p': round(float(stats.wilcoxon(d).pvalue), 6)}
-# 架构选择分布（V3.2 复核 c0 修复后，结构候选真实可达）
+# Architecture Selection Distribution (After V3.2 Review c0 Fix, Architecture Candidates Are Truly Achievable)
 import re as _re
 def _parse_arch(a):
     m = _re.match(r's(\d+),h(\d+)', str(a))

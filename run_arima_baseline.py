@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
-"""M5 前补强实验（B1）：ARIMA 基线（AIC 选阶），纯 numpy 实现。
+"""Pre-M5 Reinforcement Experiment (B1): ARIMA baseline (AIC order selection), implemented purely in NumPy.
 
-动机：S1–S4 的统计基线只有 Persistence，审稿人可能质疑"模型只比朴素基线差"。
-补一个文献标准基线：对 log(close) 做 ARIMA(p,1,0)，p ∈ {0..4} 按训练折 AIC 选阶，
-递归多步预测 t+h 收盘价；与 walk-forward 5 折协议完全一致（缩放器口径同基线：
-预测在 min-max 反缩放空间评估，与 Persistence / APSO-LSTM 直接可比）。
+Motivation: The statistical baseline for S1–S4 is only Persistence, and reviewers may question whether "the model is only worse than the naive baseline."
+Add a standard baseline from the literature: Apply ARIMA(p,1,0) to log(close), with p ∈ {0..4} and order selected based on the AIC from the training fold,
+Recursive multi-step prediction of the t+h closing price; fully consistent with the walk-forward 5-fold protocol (scaler calibration matches the baseline:
+The prediction is evaluated in the min-max inverse-scaled space, directly comparable to Persistence/APSO-LSTM).
 
-注：GARCH(1,1) 的点预测与均值模型相同（条件均值递推），对 RMSE 对比无增量，
-故基准补强的点预测部分以 ARIMA 为代表，GARCH 仅在论文中作讨论。
+Note: The point forecast of GARCH(1,1) is the same as that of the mean model (conditional mean recursion), and there is no incremental improvement in the RMSE comparison.
+Therefore, the point forecast component of the strengthened baseline is represented by ARIMA, and GARCH is only discussed in the paper.
 
-输出：output/arima_parts/<stock>.csv（每行 = stock × horizon × fold），
-随后由 s4_cells 结构并入 output/b1_cells.csv 供比值对比。
-"""
+Output: output/arima_parts/<stock>.csv (each row = stock × horizon × fold),
+Subsequently, the s4_cells structure is incorporated into output/b1_cells.csv for ratio comparison."""
 import argparse
 import os
 
@@ -27,7 +26,7 @@ PARTS_DIR = os.path.join("output", "arima_parts")
 
 
 def aic_ar(diff: np.ndarray, p: int) -> float:
-    """差分序列上 AR(p) 的最小二乘拟合 AIC（σ² 用残差方差，含常数项）。"""
+    """AIC for a least-squares AR(p) fit on the differenced series (σ² is the residual variance; includes an intercept)."""
     n = len(diff)
     if p == 0:
         resid = diff - diff.mean()
@@ -41,12 +40,12 @@ def aic_ar(diff: np.ndarray, p: int) -> float:
     beta, *_ = np.linalg.lstsq(X, y, rcond=None)
     resid = y - X @ beta
     sigma2 = max(np.mean(resid ** 2), 1e-12)
-    k = p + 2          # p 个 AR 系数 + 常数 + σ²
+    k = p + 2          # p AR coefficients + constant + σ²
     return len(y) * np.log(sigma2) + 2 * k
 
 
 def arima_forecast(train_log: np.ndarray, horizon: int) -> np.ndarray:
-    """训练折 log 价格：一阶差分 → AIC 选 p → 递归预测 horizon 步，返回 log 空间预测。"""
+    """For training-fold log prices: first-difference, select p by AIC, recursively forecast horizon steps, and return log-scale predictions."""
     diff = np.diff(train_log)
     p_best = min(range(5), key=lambda p: aic_ar(diff, p))
     n = len(diff)
@@ -82,11 +81,11 @@ def run_stock(code: str):
         train_raw = close.values[:train_end]
         test_raw = close.values[train_end:test_end]
         test_len = len(test_raw)
-        # walk-forward 滚动原点：每个测试点 t 用其之前的全部数据重新选阶+拟合，
-        # 再 h 步外推。评估目标 = close[origin + h - 1]（与 LSTM 的 realized
-        # h-day 标签完全对齐，V3.2 复核 c1 修复：旧版误与 close[origin] 比较）；
-        # 有效样本数 = test_len - h + 1（边界处 h 日窗口不完整的样本弃用，
-        # 与 LSTM 协议的标签清除规则一致）。
+        # Walk-forward rolling origin: Each test point t re-selects the order and performs fitting using all the data preceding it.
+        # Extrapolate by another h steps. Evaluation target = close[origin + h - 1] (compared with LSTM's realized
+        # H-day labels are fully aligned. V3.2 review c1 fix: The previous version was mistakenly compared with close[origin]);
+        # Number of valid samples = test_len - h + 1 (samples with incomplete h-day windows at the boundaries are discarded,
+        # Consistent with the label removal rules of the LSTM agreement).
         log_all = np.log(np.maximum(close.values, 1e-6))
         for horizon in HORIZONS:
             n_eval = test_len - horizon + 1
@@ -94,12 +93,12 @@ def run_stock(code: str):
             for i in range(n_eval):
                 origin = train_end + i
                 train_log = log_all[:origin]
-                fc = arima_forecast(train_log, horizon)   # 长度为 h 的 log 空间预测
+                fc = arima_forecast(train_log, horizon)   # Log space prediction of length h
                 preds[i] = np.exp(np.clip(fc[-1], -20, 20))
             targets = test_raw[horizon - 1:]
             row = dict(stock=code, name=CANDIDATES[code][0], tier=tier,
                        horizon=f"+{horizon}d", fold=fold, seed=0, model="ARIMA",
-                       arch="aic-ar", **metrics(targets, preds), elapsed_s=0.0)
+                       arch="aic-ar", **metrics(stocks, preds), elapsed_s=0.0)
             rows.append(row)
             print(f"  {code} +{horizon}d fold{fold} RMSE={row['RMSE']:.2f}", flush=True)
     return rows
@@ -126,8 +125,8 @@ def main():
                                       header=not os.path.exists(part),
                                       encoding="utf-8-sig")
             total += len(rows)
-        print(f"[done] {code} {CANDIDATES[code][0]} 新增 {len(rows)} 行", flush=True)
-    print(f"共 {total} 行")
+        print(f"[done] {code} {CANDIDATES[code][0]}Addition{len(rows)} row ", flush=True)
+    print(f"of{total} row ")
 
 
 if __name__ == "__main__":

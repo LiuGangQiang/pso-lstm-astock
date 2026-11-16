@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
-"""M1 基线复跑：12 只标的 × {Persistence, APSO-LSTM}，walk-forward 5 折 × 多种子。
+"""M1 baseline rerun: 12 stocks × {Persistence, APSO-LSTM}, walk-forward 5-fold × multiple seeds.
 
-协议（开题文档 V1.1 第五章 5.1）：
-- 锚定式 walk-forward 5 折：第 k 折用前 (50 + 10k)% 训练、随后 10% 测试（k = 0..4），
-  训练窗口递增，测试窗口覆盖样本后半段 5 段互不重叠区间；
-- 多种子：默认 5 个种子，报告均值 ± 标准差；
-- 确定性：torch 固定单线程 + 显式种子（原型发现同种子两次运行 RMSE 波动约 5%）；
-- 防泄漏：缩放器只在训练折内拟合；
-- 增量落盘：已完成的（标的 × horizon × fold × seed × model）组合自动跳过，可分批/断点续跑。
+Protocol (Proposal Document V1.1, Chapter 5, Section 5.1):
+- Anchored walk-forward 5-fold: Fold k uses the first (50 + 10k)% for training, followed by 10% for testing (k = 0..4),
+  The training window increases, and the test window covers 5 non-overlapping intervals in the second half of the sample;
+- Multiple seeds: 5 seeds by default, report mean ± standard deviation;
+- Determinism: Torch fixed single-threaded + explicit seed (the prototype found that the RMSE fluctuated by about 5% for two runs with the same seed);
+- Leakage prevention: The scaler is only fitted within the training fold;
+- Incremental disk writing: Completed (target × horizon × fold × seed × model) combinations are automatically skipped, allowing for batch processing/checkpoint resume.
 
-用法：
-  python run_m1_baseline.py --stocks 600036,600519 --horizons 1,5,20 --seeds 0,1,2,3,4
-"""
+Usage:
+  python run_m1_baseline.py --stocks 600036,600519 --horizons 1,5,20 --seeds 0,1,2,3,4"""
 import argparse
 import os
 import time
@@ -24,23 +23,23 @@ from pso_lstm import (LSTMRegressor, apso_weight_search, eval_mse, make_sequence
                       metrics, train_model)
 from select_stocks import CANDIDATES, fetch_daily
 
-# V1.1 定案的 12 只标的（层级, 代码）——波动率为 select_stocks.py 实测值
+# 12 stocks (tiers, codes) finalized in V1.1 — Volatility is the actual measured value from select_stocks.py
 POOL = {
-    "低波动": ["600900", "600036", "600519", "600887"],
-    "中波动": ["000333", "600276", "600031", "002415"],
-    "高波动": ["688981", "300750", "300274", "300308"],
+    'low_volatility': ["600900", "600036", "600519", "600887"],
+    'medium_volatility': ["000333", "600276", "600031", "002415"],
+    'high_volatility': ["688981", "300750", "300274", "300308"],
 }
-SEQ_LEN, HIDDEN, EPOCHS = 20, 16, 40          # 与原型 APSO-LSTM 配置一致
-SPLIT_START = 0.5     # 第一折训练终点（样本比例）
-FOLD_STEP = 0.1       # 每折推进 10%
+SEQ_LEN, HIDDEN, EPOCHS = 20, 16, 40          # Consistent with the prototype APSO-LSTM configuration
+SPLIT_START = 0.5     # End of First Fold Training (Sample Ratio)
+FOLD_STEP = 0.1       # 10% advance for each fold
 N_FOLDS = 5
-# 搜索预算（main 中由命令行覆盖；V1.2 起 M2 用 100×50）
+# Search budget (overridden by command line in main; M2 uses 100×50 from V1.2 onwards)
 APSO_PARTICLES, APSO_ITERS = 15, 20
-VAL_FITNESS = False   # V1.3：适应度用训练段内部验证切片（最后 20%）
-FITNESS_MODE = "train"   # train / val / composite（V1.3+ 实验变体）
-WEIGHT_PENALTY = 0.0     # 权重范数惩罚系数 λ（V1.4 候选路线 b）
-FITNESS_SUBSAMPLE = 0    # PSO 适应度序列子采样数（0=全量；多保真度搜索加速）
-PARTS_DIR = os.path.join("output", "m1_parts")  # 每标的一份 CSV，避免并行写冲突
+VAL_FITNESS = False   # V1.3: Internal validation slice for fitness-based training segments (last 20%)
+FITNESS_MODE = "train"   # train / val / composite (V1.3+ experimental variant)
+WEIGHT_PENALTY = 0.0     # Weight norm penalty coefficient λ (V1.4 candidate route b)
+FITNESS_SUBSAMPLE = 0    # PSO Fitness Sequence Subsampling Number (0=Full; Multi-Fidelity Search Acceleration)
+PARTS_DIR = os.path.join("output", "m1_parts")  # One CSV file per stock to avoid concurrent write conflicts
 
 
 def load_series(code: str) -> pd.Series:
@@ -51,14 +50,14 @@ def load_series(code: str) -> pd.Series:
 
 
 def fold_bounds(n: int, fold: int) -> tuple:
-    """第 fold 折：[0, train_end) 训练，[train_end, test_end) 测试。"""
+    """For fold k: train on [0, train_end) and test on [train_end, test_end)."""
     train_end = int(n * (SPLIT_START + FOLD_STEP * fold))
     test_end = int(n * (SPLIT_START + FOLD_STEP * (fold + 1)))
     return train_end, test_end
 
 
 def prepare_fold(close: pd.Series, seq_len: int, horizon: int, fold: int):
-    """折内 80/20 思路：缩放器只用训练折拟合（论文 02 防泄漏协议）。"""
+    """Fold-local preprocessing: fit the scaler only on the training fold (leakage-prevention protocol from Paper 02)."""
     n = len(close)
     train_end, test_end = fold_bounds(n, fold)
     train_raw = close.values[:train_end].copy()
@@ -74,19 +73,19 @@ def prepare_fold(close: pd.Series, seq_len: int, horizon: int, fold: int):
 
 
 def run_combo(close, code, tier, horizon, fold, seed):
-    """单个（标的 × horizon × 折 × 种子）：Persistence + APSO-LSTM。"""
+    """Single (stock × horizon × fold × seed): Persistence + APSO-LSTM."""
     out = []
     train_s, x_tr, y_tr, x_te, y_te, inv = prepare_fold(close, SEQ_LEN, horizon, fold)
     actual = inv(np.asarray(y_te))
     base = dict(stock=code, name=CANDIDATES[code][0], tier=tier,
                 horizon=f"+{horizon}d", fold=fold, seed=seed)
 
-    # Persistence（与种子无关）
+    # Persistence (not related to seeds)
     if seed == 0:
         pred = inv(np.asarray(x_te[:, -1, 0]))
         out.append({**base, "model": "Persistence", **metrics(actual, pred), "elapsed_s": 0.0})
 
-    # APSO-LSTM（论文 12 路线：PSO 演化初始权重 + Adam 精调）
+    # APSO-LSTM (Paper 12 approach: PSO evolution of initial weights + Adam fine-tuning)
     t0 = time.time()
     inner_train, val = train_s, None
     if VAL_FITNESS or FITNESS_MODE != "train":
@@ -110,18 +109,18 @@ def run_combo(close, code, tier, horizon, fold, seed):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stocks", default=None, help="逗号分隔代码，默认全部 12 只")
+    ap.add_argument("--stocks", default=None, help='Comma-separated stock codes; default is all 12')
     ap.add_argument("--horizons", default="1,3,5,10,20")
     ap.add_argument("--seeds", default="0,1,2,3,4")
     ap.add_argument("--folds", default="0,1,2,3,4")
     ap.add_argument("--apso-particles", type=int, default=15)
     ap.add_argument("--apso-iters", type=int, default=20)
-    ap.add_argument("--tag", default="m1", help="输出分区 output/<tag>_parts/")
+    ap.add_argument("--tag", default="m1", help='Output partition output/<tag>_parts/')
     ap.add_argument("--val-fitness", action="store_true",
-                    help="V1.3：PSO 适应度用训练段内部验证切片（最后 20%）")
+                    help='V1.3: PSO fitness uses internal validation slices from the training set (last 20%)')
     ap.add_argument("--fitness-mode", default="train", choices=["train", "val", "composite"])
-    ap.add_argument("--weight-penalty", type=float, default=0.0, help="权重范数惩罚 λ")
-    ap.add_argument("--fitness-subsample", type=int, default=0, help="PSO 适应度子采样序列数（0=全量）")
+    ap.add_argument("--weight-penalty", type=float, default=0.0, help='Weight-norm penalty λ')
+    ap.add_argument("--fitness-subsample", type=int, default=0, help='Number of PSO fitness subsampling sequences (0=full)')
     args = ap.parse_args()
 
     global APSO_PARTICLES, APSO_ITERS, PARTS_DIR, VAL_FITNESS, FITNESS_MODE, WEIGHT_PENALTY, FITNESS_SUBSAMPLE
@@ -132,7 +131,7 @@ def main():
     FITNESS_SUBSAMPLE = args.fitness_subsample
     PARTS_DIR = os.path.join("output", f"{args.tag}_parts")
 
-    torch.set_num_threads(1)  # 确定性：单线程 + 显式种子
+    torch.set_num_threads(1)  # Determinism: Single-threaded + Explicit Seed
     os.makedirs("output", exist_ok=True)
 
     tiers = {c: t for t, codes in POOL.items() for c in codes}
@@ -166,12 +165,12 @@ def main():
                         print(f"[done] {code} {CANDIDATES[code][0]} +{horizon}d fold{fold} "
                               f"seed{seed} {r['model']} RMSE={r['RMSE']:.3f} {r['elapsed_s']}s", flush=True)
                     if rows:
-                        # 逐组合落盘：超时被杀也不丢已完成的结果
+                        # Execute by combination: Even if the order is killed due to timeout, the completed results will not be lost.
                         pd.DataFrame(rows).to_csv(part, mode="a", index=False,
                                                   header=not os.path.exists(part),
                                                   encoding="utf-8-sig")
                         total += len(rows)
-    print(f"\n本批写入/追加 {total} 行到 {PARTS_DIR}/（每只标的独立文件）" if total else "本批无新增（全部已完成）")
+    print(f"Rows written/appended in this batch: {total}; directory: {PARTS_DIR}/ (one CSV per stock)" if total else 'No new rows in this batch (all combinations completed)')
 
 
 if __name__ == "__main__":

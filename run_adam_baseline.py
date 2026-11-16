@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-"""M5 前补强实验（B2）：等协议 Adam-only 对照（无 PSO 预搜索）。
+"""M5 Pre-Reinforcement Experiment (B2): Adam-only control with the same protocol (no PSO pre-search).
 
-动机：回应"APSO-LSTM 的表现只是算力堆出来的 / PSO 预搜索是否有贡献"。
-同一 LSTM（s20,h16）、同一 walk-forward 5 折 × 5 种子、同一 Adam 精调
-（40 epochs, lr=0.005, seed 一致），唯一区别：不做 APSO 权重搜索，
-初始权重用论文 12 的 Glorot/正交初始化（init_weights_paper12）。
-若 Adam-only 与 APSO-LSTM 无显著差异，则 PSO 预搜索的增量为零；
-这也是"PSO 价值在 basin selection 而非精度"的又一佐证。
+Motivation: To address the question of whether "the performance of APSO-LSTM is merely a result of computational power / whether PSO pre-search contributes."
+Same LSTM (s20, h16), same walk-forward 5-fold × 5 seeds, same Adam fine-tuning
+(40 epochs, lr=0.005, same seed), the only difference: no APSO weight search,
+The initial weights use the Glorot/orthogonal initialization from Paper 12 (init_weights_paper12).
+If there is no significant difference between Adam-only and APSO-LSTM, then the incremental contribution of the PSO pre-search is zero;
+This is also further evidence that "the value of PSO lies in basin selection rather than accuracy."
 
-输出：output/adam_parts/<stock>.csv。
-"""
+Output: output/adam_parts/<stock>.csv."""
 import argparse
 import os
 import time
@@ -70,8 +69,8 @@ def main():
                                       header=not os.path.exists(part),
                                       encoding="utf-8-sig")
             total += len(rows)
-        print(f"[done] {code} 新增 {len(rows)} 行", flush=True)
-    print(f"共 {total} 行")
+        print(f"[done] {code}Addition{len(rows)} row ", flush=True)
+    print(f"of{total} row ")
 
 
 if __name__ == "__main__":

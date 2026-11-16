@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""B1 推断口径精确重算（V3.5，复核批注 c1/c2/c15）。
+"""Exact recalculation of B1 inference statistics (V3.5, review comments c1/c2/c15).
 
-推断统计量 = 每股 5 折比值的中位数（4.2 统一口径）；每股均值仅作 Table 3 描述。
-输出 output/b1_stock_stats_v35.csv（wide 表：feature × stat × horizon）。
+The inferential statistic is the median of each stock's five fold ratios (Section 4.2 convention); per-stock means are used only for Table 3 descriptions.
+Output: output/b1_stock_stats_v35.csv (wide table: feature × stat × horizon).
 """
 import glob
 
@@ -19,12 +19,12 @@ H = ["+1d", "+5d", "+20d"]
 
 
 def stock_stats(df, prefix):
-    if prefix == "APSO-LSTM$":  # exact match（避免 startswith 误配 tech/sent）
+    if prefix == "APSO-LSTM$":  # Exact match (avoid startswith mismatching tech/sent)
         d = df[df.model == "APSO-LSTM"]
     else:
         d = df[df.model.str.startswith(prefix)]
     m = d.merge(pp, on=["stock", "horizon", "fold"], how="inner")
-    assert len(m) == len(d), f"{prefix}: persistence 配对缺失"
+    assert len(m) == len(d), f"{prefix}: Persistence pairing missing"
     m["ratio"] = m.RMSE / m.pers
     g = m.groupby(["stock", "horizon"]).ratio.agg(["median", "mean"]).reset_index()
     return g.pivot_table(index="stock", columns="horizon", values="median")[H], \
@@ -44,13 +44,13 @@ for feat, df_, prefix in [("arima", ar, "ARIMA"), ("price", s1, "APSO-LSTM$"),
                           ("tech", s3, "APSO-LSTM-tech"), ("sent", s3, "APSO-LSTM-sent")]:
     med[feat], mean[feat] = stock_stats(df_, prefix)
 
-# Adam-only：per-stock 中位数 over 25 fold×seed
+# Adam-only: Per-stock median over 25 fold×seed
 adm = ad.merge(pp, on=["stock", "horizon", "fold"], how="inner")
 assert len(adm) == len(ad)
 adm["ratio"] = adm.RMSE / adm.pers
 adam_med = adm.groupby(["stock", "horizon"]).ratio.median().unstack()[H]
 
-print("== ARIMA vs Persistence（每股中位数 对 1，双侧精确 Wilcoxon）==")
+print('== ARIMA vs. Persistence (Median per stock vs. 1, two-sided exact Wilcoxon) ==')
 for h in H:
     d = med["arima"][h] - 1.0
     p = stats.wilcoxon(d, alternative="two-sided", method="exact").pvalue
@@ -58,25 +58,23 @@ for h in H:
           f"stockmedian={med['arima'][h].median():.4f} stockmean={med['arima'][h].mean():.4f}")
 
 print()
-print("== ARIMA vs APSO-LSTM（配对，每股中位数）==")
+print('== ARIMA vs. APSO-LSTM (Paired, Median per Share) ==')
 for h in H:
     d = med["arima"][h] - med["price"][h]
     p = stats.wilcoxon(d, alternative="two-sided", method="exact").pvalue
     rel = med["arima"][h] / med["price"][h]
-    print(f"  {h}: ARIMA 更好 {(d < 0).sum()}/12  p={p:.6f}  "
-          f"相对比值 median={rel.median():.3f} mean={rel.mean():.3f}")
+    print(f"  {h}: ARIMA is better{(d < 0).sum()}/12  p={p:.6f}Relative ratio median={rel.median():.3f} mean={rel.mean():.3f}")
 
 print()
-print("== Adam-only vs APSO-LSTM（配对，每股中位数）==")
+print('== Adam-only vs. APSO-LSTM (paired, median per stock) ==')
 for h in H:
     d = adam_med[h] - med["price"][h]
     p = stats.wilcoxon(d, alternative="two-sided", method="exact").pvalue
     rel = adam_med[h] / med["price"][h]
-    print(f"  {h}: Adam 更好 {(d < 0).sum()}/12  p={p:.6f}  "
-          f"相对比值 median={rel.median():.3f} mean={rel.mean():.3f}")
+    print(f"  {h}: Adam is better.{(d < 0).sum()}/12  p={p:.6f}Relative ratio median={rel.median():.3f} mean={rel.mean():.3f}")
 
 print()
-print("== 描述口径（Table 3 用，每股均值→跨股中位数）==")
+print('== Description of metrics (for Table 3, average per stock → median across stocks) ==')
 for feat in ["arima", "price", "tech", "sent"]:
     print(f"  {feat}: " + " / ".join(f"{mean[feat][h].median():.4f}" for h in H))
 

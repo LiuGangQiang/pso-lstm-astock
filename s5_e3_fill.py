@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
-"""S5-E3 补充：补齐 λ=0 对照组在低信号档 (r=0.2, 0.4) 的缺失单元格，
-使 E2 覆盖完整的 5 r × 2 λ 网格（共 200 组主实验）。
+"""S5-E3 Supplement: Fill in the missing cells for the λ=0 control group at the low signal levels (r=0.2, 0.4),
+so that E2 covers the entire 5 r × 2 λ grid (a total of 200 sets of main experiments).
 
-结果追加到 output/s5_e3_parts/s5_e3.csv（与原有 160 组同构）。
+The results are appended to output/s5_e3_parts/s5_e3.csv (isomorphic with the original 160 groups).
 
-用法：
-  python s5_e3_fill.py                # 时间盒续跑（默认 250 秒）
-  python s5_e3_fill.py --budget 600
-"""
+Usage:
+  python s5_e3_fill.py                # Time-budget continued run (default 250 seconds)
+  python s5_e3_fill.py --budget 600"""
 import argparse
 import os
 import time
@@ -32,30 +31,30 @@ def main():
     if os.path.exists(CSV_PATH):
         df = pd.read_csv(CSV_PATH)
         done = set(zip(df.r, df.lam, df.seed))
-        print(f"已完成 {len(done)} 组，断点续跑")
+        print(f"Completed {len(done)}Set, resume from breakpoint")
 
     combos = [(r, lam, seed) for (r, lam) in CELLS for seed in SEEDS
               if (r, lam, seed) not in done]
-    print(f"剩余 {len(combos)} 组")
+    print(f"Remaining {len(combos)}Group")
     t_start = time.time()
     rows, n_new = [], 0
     for r, lam, seed in combos:
         try:
             row = run_one(r, lam, seed)
-        except Exception as e:  # 单组失败不中断整批
+        except Exception as e:  # Failure of a single group does not interrupt the entire batch
             row = dict(r=r, lam=lam, seed=seed, error=str(e))
         rows.append(row)
         n_new += 1
         print(f"[{n_new}] r={r} λ={lam} seed={seed} "
               f"chosen=s{row.get('chosen_seq','?')},h{row.get('chosen_hidden','?')}", flush=True)
         if time.time() - t_start > args.budget:
-            print("时间盒用尽，保存本批结果")
+            print('Time budget exhausted; saved results from this batch')
             break
     if rows:
         df = pd.DataFrame(rows)
         df.to_csv(CSV_PATH, mode="a", index=False,
                   header=not os.path.exists(CSV_PATH))
-        print(f"本批完成 {len(rows)} 组 -> {CSV_PATH}")
+        print(f"Completed in this batch: {len(rows)}Group{CSV_PATH}")
 
 
 if __name__ == "__main__":

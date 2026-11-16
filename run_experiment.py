@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-"""端到端实验：4 个模型 × 3 只 A 股的对比。
+"""End-to-end comparison of four models on three A-share stocks.
 
-模型：
-  1. LSTM      —— 固定架构基线（hidden=32, seq_len=20, Adam）
-  2. GS-LSTM   —— 网格搜索超参数（论文 02 基线的精简版）
-  3. PSO-LSTM  —— PSO 搜索 (seq_len, hidden, epochs)（论文 02 路线 A）
-  4. APSO-LSTM —— 自适应 PSO 演化初始权重 + Adam 精调（论文 12 路线 B）
+Models:
+  1. LSTM: fixed-architecture baseline (hidden=32, seq_len=20, Adam)
+  2. GS-LSTM: grid-searched hyperparameters (compact baseline from Paper 02)
+  3. PSO-LSTM: PSO search over (seq_len, hidden, epochs) (Paper 02, Route A)
+  4. APSO-LSTM: adaptive PSO evolution of initial weights + Adam fine-tuning (Paper 12, Route B)
 
-实验协议沿用论文 02 的防泄漏做法：先 80/20 分割，再用训练集拟合 MinMax 缩放器；
-评价在原始价格尺度上进行。指标为论文 12 五指标 + 论文 02 的 NRMSE 与 %Similar。
+The protocol follows Paper 02 to prevent leakage: split 80/20 first, then fit MinMax scaling on the training set.
+Evaluation uses the original price scale. Metrics comprise five from Paper 12 plus NRMSE and %Similar from Paper 02.
 """
 import os
 import time
@@ -32,20 +32,20 @@ TEST_RATIO = 0.2
 HIDDEN_BASE = 32
 SEQ_BASE = 20
 EPOCHS_BASE = 40
-HORIZONS = [1, 3, 5]  # 预测期：t+1 / t+3 / t+5 日
-GRID = [(s, h) for s in (10, 20, 40) for h in (16, 32, 64)]  # GS-LSTM 网格（9 组合）
+HORIZONS = [1, 3, 5]  # Forecast period: t+1 / t+3 / t+5 days
+GRID = [(s, h) for s in (10, 20, 40) for h in (16, 32, 64)]  # GS-LSTM Grid (9 Combinations)
 
 
 def load_series(code: str) -> pd.Series:
     path = fetch_daily(code)
     df = pd.read_csv(path, parse_dates=["date"]).sort_values("date")
     close = df.set_index("date")["close"].astype(float)
-    close = close[(close > 0)]  # 剔除脏数据
+    close = close[(close > 0)]  # Remove Dirty Data
     return close
 
 
 def prepare(close: pd.Series, seq_len: int, horizon: int = 1):
-    """先分割、后缩放（论文 02，防数据泄漏）。"""
+    """Partition first, then scale (Paper 02, Preventing Data Leakage)."""
     n = len(close)
     split = int(n * (1 - TEST_RATIO))
     train_raw, test_raw = close.values[:split], close.values[split:]
@@ -62,16 +62,16 @@ def prepare(close: pd.Series, seq_len: int, horizon: int = 1):
 def run_stock(code: str, name: str, horizon: int = 1) -> pd.DataFrame:
     print(f"\n{'=' * 60}\n### {code} {name}  horizon=+{horizon}d\n{'=' * 60}")
     close = load_series(code)
-    print(f"数据区间 {close.index[0].date()} ~ {close.index[-1].date()}，共 {len(close)} 个交易日")
+    print(f"Date range: {close.index[0].date()} ~ {close.index[-1].date()}, totaling {len(close)}Trading days")
 
-    # 波动率标注：年化日收益波动
+    # Volatility legend: Annualized daily return volatility
     vol = close.pct_change().std() * np.sqrt(244) * 100
-    print(f"年化波动率 ≈ {vol:.1f}%")
+    print(f"Annualized volatility ≈ {vol:.1f}%")
 
     rows, curves = [], {}
 
     def score(model, label, elapsed):
-        """在原始价格尺度上计算指标并记录预测曲线。"""
+        """Calculate indicators on the original price scale and record the forecast curve."""
         with torch.no_grad():
             pred_s = model(torch.from_numpy(x_te)).numpy()
         actual = inv(np.asarray(y_te))
@@ -79,20 +79,20 @@ def run_stock(code: str, name: str, horizon: int = 1) -> pd.DataFrame:
         rows.append((label, *metrics(actual, pred).values(), f"{elapsed:.0f}s"))
         curves[label] = pred
 
-    # ---------- 0. Persistence 朴素基线（最后观测值 = 未来 horizon 日预测） ----------
+    # ---------- 0. Persistence Simple Baseline (Last Observed Value = Future Horizon Day Forecast) ----------
     x_tr, y_tr, x_te, y_te, inv = prepare(close, SEQ_BASE, horizon)
     pred = inv(np.asarray(x_te[:, -1, 0]))
     rows.append(("Persistence", *metrics(inv(np.asarray(y_te)), pred).values(), "0s"))
     curves["Persistence"] = pred
 
-    # ---------- 1. 标准 LSTM 基线 ----------
+    # ---------- 1. Standard LSTM Baseline ----------
     t0 = time.time()
     x_tr, y_tr, x_te, y_te, inv = prepare(close, SEQ_BASE, horizon)
     model = LSTMRegressor(hidden=HIDDEN_BASE)
     train_model(model, x_tr, y_tr, epochs=EPOCHS_BASE, seed=0)
-    score(model, "LSTM(基线)", time.time() - t0)
+    score(model, 'LSTM (Baseline)', time.time() - t0)
 
-    # ---------- 2. GS-LSTM 网格搜索 ----------
+    # ---------- 2. GS-LSTM Grid Search ----------
     t0 = time.time()
     best_gs, best_mse = None, np.inf
     for s, h in GRID:
@@ -107,7 +107,7 @@ def run_stock(code: str, name: str, horizon: int = 1) -> pd.DataFrame:
     train_model(m, x_tr, y_tr, epochs=EPOCHS_BASE, seed=0)
     score(m, f"GS-LSTM(s{s},h{h})", time.time() - t0)
 
-    # ---------- 3. PSO-LSTM：搜索超参数/序列长度（论文 02 路线 A） ----------
+    # ---------- 3. PSO-LSTM: Search for Hyperparameters/Sequence Length (Paper 02, Route A) ----------
     t0 = time.time()
     split = int(len(close) * (1 - TEST_RATIO))
     tr = close.values[:split]
@@ -115,10 +115,10 @@ def run_stock(code: str, name: str, horizon: int = 1) -> pd.DataFrame:
     (s, h, e), fit, hist_a = pso_hyper_search(train_s, seed=0, horizon=horizon)
     x_tr, y_tr, x_te, y_te, inv = prepare(close, s, horizon)
     m = LSTMRegressor(hidden=h)
-    train_model(m, x_tr, y_tr, epochs=EPOCHS_BASE, seed=0)  # 与基线同等训练预算，公平比较
+    train_model(m, x_tr, y_tr, epochs=EPOCHS_BASE, seed=0)  # Same training budget as baseline for a fair comparison
     score(m, f"PSO-LSTM(s{s},h{h})", time.time() - t0)
 
-    # ---------- 4. APSO-LSTM：演化初始权重 + Adam 精调（论文 12 路线 B） ----------
+    # ---------- 4. APSO-LSTM: Evolutionary Initial Weights + Adam Fine-Tuning (Paper 12, Route B) ----------
     t0 = time.time()
     x_tr, y_tr, x_te, y_te, inv = prepare(close, SEQ_BASE, horizon)
     best_vec, fit, hist_b = apso_weight_search(train_s,
@@ -127,10 +127,10 @@ def run_stock(code: str, name: str, horizon: int = 1) -> pd.DataFrame:
     m.set_vector(best_vec)
     pre_mse = eval_mse(m, x_tr, y_tr)
     train_model(m, x_tr, y_tr, epochs=EPOCHS_BASE, lr=0.005, seed=0)
-    print(f"  PSO 阶段训练MSE={pre_mse:.6f} -> Adam 精调后 {eval_mse(m, x_tr, y_tr):.6f}")
-    score(m, "APSO-LSTM(论文12)", time.time() - t0)
+    print(f"PSO Phase Training MSE={pre_mse:.6f}-> After Adam's fine-tuning{eval_mse(m, x_tr, y_tr):.6f}")
+    score(m, 'APSO-LSTM (Paper 12)', time.time() - t0)
 
-    # ---------- 5. Unified-PSO-LSTM：架构段+权重段统一编码（本研究创新点） ----------
+    # ---------- 5. Unified-PSO-LSTM: Unified Encoding of Architecture Segment + Weight Segment (Innovation of This Study) ----------
     t0 = time.time()
     best_vec, fit, hist_c, decode = unified_pso_search(train_s, seed=0, horizon=horizon)
     s, h = decode(best_vec)
@@ -139,11 +139,11 @@ def run_stock(code: str, name: str, horizon: int = 1) -> pd.DataFrame:
     m.set_vector(best_vec[2:2 + m.get_vector().size])
     pre_mse = eval_mse(m, x_tr, y_tr)
     train_model(m, x_tr, y_tr, epochs=EPOCHS_BASE, lr=0.005, seed=0)
-    print(f"  Unified 选中 s{s},h{h}；PSO 阶段训练MSE={pre_mse:.6f} -> Adam 精调后 {eval_mse(m, x_tr, y_tr):.6f}")
+    print(f"Unified Selected s{s},h{h}; PSO-stage training MSE={pre_mse:.6f}-> After Adam's fine-tuning{eval_mse(m, x_tr, y_tr):.6f}")
     score(m, f"Unified-PSO(s{s},h{h})", time.time() - t0)
 
-    # ---------- 结果表与图 ----------
-    cols = ["model", "MSE", "RMSE", "MAPE%", "MAAPE%", "SMAPE%", "TheilU", "NRMSE", "%Similar", "耗时"]
+    # ---------- Results Table and Figures ----------
+    cols = ["model", "MSE", "RMSE", "MAPE%", "MAAPE%", "SMAPE%", "TheilU", "NRMSE", "%Similar", 'elapsed']
     df = pd.DataFrame(rows, columns=cols)
     print("\n" + df.to_string(index=False))
 
@@ -174,4 +174,4 @@ if __name__ == "__main__":
     result = pd.concat(all_rows, ignore_index=True)
     out = os.path.join(RESULT_DIR, "metrics_summary.csv")
     result.to_csv(out, index=False, encoding="utf-8-sig")
-    print(f"\n汇总结果已保存：{out}")
+    print(f"Aggregated results have been saved:{out}")

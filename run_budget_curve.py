@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""预算曲线并行驱动（分块 + 容错，Windows spawn 友好）。"""
+"""Parallel driver for the budget curve (chunked, fault-tolerant, and compatible with Windows spawn)."""
 import os
 
 import pandas as pd
@@ -15,7 +15,7 @@ def main():
         done = set(zip(df.budget, df.hidden, df.seed))
     combos = [(b, h, s) for b in BUDGETS for h in HIDS for s in SEEDS
               if (b, h, s) not in done]
-    print(f"剩余 {len(combos)} 组")
+    print(f"Remaining {len(combos)}Group")
     block, rows = combos[:20], []
     with ProcessPoolExecutor(max_workers=6) as ex:
         futs = {ex.submit(run_one, b, h, s): (b, h, s) for b, h, s in block}
@@ -28,7 +28,7 @@ def main():
     if rows:
         df = pd.DataFrame(rows)
         df.to_csv(OUT, mode="a", index=False, header=not os.path.exists(OUT))
-    print(f"本块完成 {len(rows)}/{len(block)} -> {OUT}")
+    print(f"Chunk completed {len(rows)}/{len(block)} -> {OUT}")
 
 
 if __name__ == "__main__":

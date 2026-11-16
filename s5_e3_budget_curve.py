@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
-"""E2 补充：固定架构权重搜索的预算曲线（V3.5，复核批注 c11）。
+"""E2 Supplement: Budget curve for fixed architecture weight search (V3.5, review annotation c11).
 
-协议与已归档 P3 探针逐参数一致（合成 r=0.95、数据 seed=0、seq=10、λ=0、
-子采样 600、apso_weight_search），仅改变搜索预算：
-  B1 = 25 粒子 × 12 代（300 次评估）
-  B2 = 50 粒子 × 25 代（1250 次评估）
-  B3 = 100 粒子 × 50 代（5000 次评估；与 P3 相同）
-每个预算 × {h8, h32} × 10 个搜索种子（0–9）。
+The protocol is consistent with the archived P3 probe parameter by parameter (synthetic r=0.95, data seed=0, seq=10, λ=0,
+Subsampling 600, apso_weight_search), only the search budget is changed:
+  B1 = 25 particles × 12 generations (300 evaluations)
+  B2 = 50 particles × 25 generations (1250 evaluations)
+  B3 = 100 particles × 50 generations (5000 evaluations; same as P3)
+Each budget × {h8, h32} × 10 search seeds (0–9).
 
-用途：检验"低预算偏向低维网络"是否随预算增大而减弱（预算–维度耦合的方向性信号，
-探索性分析）。
+Purpose: To test whether the "low-budget bias toward low-dimensional networks" weakens as the budget increases (a directional signal of budget–dimensionality coupling,
+exploratory analysis).
 
-用法：
-  python s5_e3_budget_curve.py                  # 全部（断点续跑）
+Usage:
+  python s5_e3_budget_curve.py                  # All (resume from breakpoint)
   python s5_e3_budget_curve.py --budget 50x25 --hid 32 --seed 3
-输出：output/s5_e3_parts/s5_e3_budget_curve.csv
-"""
+Output: output/s5_e3_parts/s5_e3_budget_curve.csv"""
 import argparse
 import os
 import sys
@@ -63,10 +62,10 @@ def main():
     if os.path.exists(OUT):
         df = pd.read_csv(OUT)
         done = set(zip(df.budget, df.hidden, df.seed))
-        print(f"已完成 {len(done)} 组，断点续跑")
+        print(f"Completed {len(done)}Set, resume from breakpoint")
     combos = [(b, h, s) for b in BUDGETS for h in HIDS for s in SEEDS
               if (b, h, s) not in done]
-    print(f"剩余 {len(combos)} 组")
+    print(f"Remaining {len(combos)}Group")
     rows = []
     for b, h, s in combos:
         rows.append(run_one(b, h, s))

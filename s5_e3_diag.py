@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
-"""E3 前置诊断 V3.5 修订版：验证合成生成器各结构的可达 MSE 差距（结构信号强度）。
+"""E3 Pre-Diagnosis V3.5 Revision: Verify the reachable MSE gap (structural signal strength) for each structure of the synthetic generator.
 
-V3.5 修订（复核批注 c13）：
-  1. seed bug 修复——torch.manual_seed 在模型构造之前设置（旧版 LSTMRegressor
-     的权重初始化发生在 train_model 内部 seeding 之前，初始化不可复现）；
-  2. 增加 held-out 对照——在训练段之外的最后 500 点（同一 min-max 缩放）上评估
-     样本外 MSE，检验"结构信号"是否带来可泛化的差距而非仅训练段过拟合。
+V3.5 Revision (Review Annotation c13):
+  1. Seed bug fix – torch.manual_seed is set before model construction (in the old version of LSTMRegressor,
+     weight initialization occurred before seeding within train_model, and the initialization was not reproducible);
+  2. Add a held-out control — evaluate the out-of-sample MSE on the last 500 points outside the training segment (using the same min-max scaling)
+     out-of-sample MSE to test whether the "structural signal" leads to a generalizable gap rather than merely overfitting the training segment.
 
-输出：output/s5_e3_diag_v35.csv
-"""
+Output: output/s5_e3_diag_v35.csv"""
 import os
 import sys
 
@@ -46,7 +45,7 @@ def main():
         ho_s = ((ho - lo) / (hi - lo)).astype(np.float32)
         for seq, hid in GRID:
             for seed in seeds:
-                torch.manual_seed(seed)  # 必须在模型构造前 seeding（c13 修复）
+                torch.manual_seed(seed)  # Seeding must be done before model construction (c13 fix)
                 m = LSTMRegressor(hidden=hid)
                 train_model(m, make_sequences(tr_s, seq, 1)[0],
                             make_sequences(tr_s, seq, 1)[1],
@@ -61,7 +60,7 @@ def main():
     df = pd.DataFrame(rows)
     df.to_csv(args.out, index=False)
     print()
-    print("== 汇总（3 seeds 均值）==")
+    print('== Summary (average of 3 seeds) ==')
     print(df.groupby(["r", "seq", "hid"])[["train_mse", "heldout_mse"]].mean().round(4))
 
 

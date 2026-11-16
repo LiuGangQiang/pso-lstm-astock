@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
-"""重建 output/b1_cells.csv（V3.2 复核 c1 修复后）。
+"""Rebuild output/b1_cells.csv after V3.2 review fix c1.
 
-每行 = (stock, horizon, feature) 的 per-stock 比值（对 5 折取均值）：
+Each row contains a per-stock ratio for (stock, horizon, feature), averaged over five folds:
   ratio(fold) = RMSE(feature, fold) / RMSE(Persistence, fold)
-Persistence 取运行级记录值（与 LSTM 共用测试窗）。feature ∈ {arima, price,
-tech, sent}；arima 为对齐版重跑（arima_parts/，2026-11-09）。
+Persistence uses run-level records sharing the LSTM test window. feature ∈ {arima, price, tech, sent};
+ARIMA is the aligned rerun (arima_parts/, 2026-11-09).
 """
 import glob
 import json
 
 import pandas as pd
 
-# ---- persistence 表（运行级记录值）----
+# ---- Persistence table (operational-level recorded values) ----
 s1 = pd.concat([pd.read_csv(f, dtype={"stock": str})
                 for f in glob.glob("output/s1v14_parts/*.csv")], ignore_index=True)
 pp = (s1[s1["model"] == "Persistence"][["stock", "horizon", "fold", "RMSE"]]
@@ -21,7 +21,7 @@ pp = (s1[s1["model"] == "Persistence"][["stock", "horizon", "fold", "RMSE"]]
 def per_stock_ratios(df, model_filter, feature):
     d = df[df["model"].str.startswith(model_filter)]
     m = d.merge(pp, on=["stock", "horizon", "fold"], how="inner")
-    assert len(m) == len(d), "persistence 配对缺失"
+    assert len(m) == len(d), 'Persistence pairing missing'
     m["ratio"] = m["RMSE"] / m["pers"]
     g = m.groupby(["stock", "name", "tier", "horizon"])["ratio"].mean().reset_index()
     g["feature"] = feature
@@ -42,7 +42,7 @@ frames.append(per_stock_ratios(s3, "APSO-LSTM-sent", "sent"))
 out = pd.concat(frames, ignore_index=True)
 out.to_csv("output/b1_cells.csv", index=False, encoding="utf-8-sig")
 
-# ---- 对齐版 ARIMA 新比值概览 ----
+# ---- Overview of New ARIMA Ratios for Aligned Version ----
 piv = out[out.feature == "arima"].pivot_table(
     index="stock", columns="horizon", values="ratio")[["+1d", "+5d", "+20d"]]
 summary = {"arima_stockmean": {h: round(float(piv[h].mean()), 4) for h in piv.columns},

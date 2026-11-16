@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""M1 标的池筛选：拉取沪深 300 候选股日线，计算年化波动率，供分层选样。
+"""M1 Target Pool Screening: Retrieve the daily bars of CSI 300 candidate stocks, calculate the annualized volatility, and use it for stratified sampling.
 
-候选池选取原则：均为沪深 300 成分股（各行业代表性大盘蓝筹），
-覆盖低波动（金融/公用/消费）到高波动（创业板/科技）的完整谱系。
-"""
+Selection criteria for the candidate pool: All are CSI 300 constituent stocks (representative large-cap blue-chip stocks from various industries),
+covering the full spectrum from low volatility (financials/utilities/consumer) to high volatility (ChiNext/technology)."""
 import json
 import os
 import time
@@ -12,31 +11,31 @@ import urllib.request
 BASE = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data_pool")
 
-# 行业分散的候选池（代码: (名称, 行业)）
+# Candidate Pool with Industry Dispersion (Code: (Name, Industry))
 CANDIDATES = {
-    # 金融（预期低波）
-    "600036": ("招商银行", "银行"), "601398": ("工商银行", "银行"),
-    "601288": ("农业银行", "银行"), "000001": ("平安银行", "银行"),
-    "601318": ("中国平安", "保险"), "600030": ("中信证券", "券商"),
-    # 消费（低-中波）
-    "600519": ("贵州茅台", "白酒"), "000858": ("五粮液", "白酒"),
-    "600887": ("伊利股份", "食品饮料"), "000333": ("美的集团", "家电"),
-    "600690": ("海尔智家", "家电"), "000651": ("格力电器", "家电"),
-    # 公用/能源（预期低波）
-    "600900": ("长江电力", "公用事业"), "601088": ("中国神华", "煤炭"),
-    "601857": ("中国石油", "石油石化"), "600028": ("中国石化", "石油石化"),
-    # 医药（中波）
-    "600276": ("恒瑞医药", "医药"), "300760": ("迈瑞医疗", "医疗器械"),
-    "603259": ("药明康德", "医药外包"),
-    # 制造（中波）
-    "600031": ("三一重工", "工程机械"), "000425": ("徐工机械", "工程机械"),
-    # 电子/科技（中-高波）
-    "002415": ("海康威视", "电子安防"), "000063": ("中兴通讯", "通信设备"),
-    "603501": ("韦尔股份", "半导体"), "688981": ("中芯国际", "半导体"),
-    "300308": ("中际旭创", "光模块"),
-    # 新能源（预期高波）
-    "300750": ("宁德时代", "动力电池"), "002594": ("比亚迪", "新能源汽车"),
-    "601012": ("隆基绿能", "光伏"), "300274": ("阳光电源", "光伏逆变"),
+    # Financials (expected low volatility)
+    "600036": ('China Merchants Bank', 'Banking'), "601398": ('ICBC', 'Banking'),
+    "601288": ('Agricultural Bank of China', 'Banking'), "000001": ('Ping An Bank', 'Banking'),
+    "601318": ('Ping An Insurance', 'Insurance'), "600030": ('CITIC Securities', 'Securities'),
+    # Consumer staples (low-to-medium volatility)
+    "600519": ('Kweichow Moutai', 'Baijiu'), "000858": ('Wuliangye', 'Baijiu'),
+    "600887": ('Yili Group', 'Food and Beverage'), "000333": ('Midea Group', 'Home Appliances'),
+    "600690": ('Haier Smart Home', 'Home Appliances'), "000651": ('Gree Electric', 'Home Appliances'),
+    # Utilities/Energy (Expected Low Volatility)
+    "600900": ('China Yangtze Power', 'Utilities'), "601088": ('China Shenhua Energy', 'Coal'),
+    "601857": ('PetroChina', 'Petroleum and Petrochemicals'), "600028": ('Sinopec', 'Petroleum and Petrochemicals'),
+    # Pharmaceuticals (medium volatility)
+    "600276": ('Hengrui Pharmaceuticals', 'Pharmaceuticals'), "300760": ('Mindray Medical', 'Medical Devices'),
+    "603259": ('WuXi AppTec', 'Pharmaceutical Outsourcing'),
+    # Manufacturing (medium volatility)
+    "600031": ('SANY Heavy Industry', 'Construction Machinery'), "000425": ('XCMG', 'Construction Machinery'),
+    # Electronics/Technology (Medium-High Volatility)
+    "002415": ('Hikvision', 'Electronic Security'), "000063": ('ZTE', 'Telecommunications Equipment'),
+    "603501": ('Will Semiconductor', 'Semiconductors'), "688981": ('SMIC', 'Semiconductors'),
+    "300308": ('Zhongji Innolight', 'Optical Modules'),
+    # New Energy (Expected High Volatility)
+    "300750": ('CATL', 'Power Batteries'), "002594": ('BYD', 'New Energy Vehicles'),
+    "601012": ('LONGi Green Energy', 'Photovoltaics'), "300274": ('Sungrow Power Supply', 'Photovoltaic Inverters'),
 }
 
 
@@ -61,7 +60,7 @@ def fetch_daily(code: str, beg: str = "20150101", end: str = "20251231") -> str:
         f.write("date,open,close,high,low,volume,amount\n")
         for line in klines:
             f.write(line + "\n")
-    print(f"[fetch] {code} {CANDIDATES[code][0]}: {len(klines)} 条")
+    print(f"[fetch] {code} {CANDIDATES[code][0]}: {len(klines)}rows")
     time.sleep(0.5)
     return out
 
@@ -94,6 +93,6 @@ if __name__ == "__main__":
         except Exception as e:  # noqa: BLE001
             print(f"[skip] {code} {name}: {e}")
     rows.sort()
-    print("\n代码      名称        行业          年化波动%(2015-2025)  交易日")
+    print('Code      Name        Sector          Annualized Volatility % (2015–2025)  Trading Days')
     for vol, code, name, industry, n in rows:
         print(f"{code}  {name:<6}  {industry:<8}  {vol:8.1f}        {n}")

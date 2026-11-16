@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-"""E3/E2 判决探针重跑（V3.2 复核 c0/c7 修复后，2026-11-09）。
+"""E3/E2 decision probe rerun (V3.2 review after c0/c7 fix, 11/09/2026).
 
-三个探针（均用合成数据 r=0.95, seed 递增）：
-  P1 staged：分阶段编码（外层结构 12×10 + 内层 10×8，λ=0）8 seeds
-  P2 budget：统一编码 6× 预算（30×60，λ=0）6 seeds
-  P3 fixed ：固定架构纯权重搜索（100×50，λ=0）h8 vs h32 5 seeds
-输出：output/s5_e3_parts/s5_e3_probes.csv
-"""
+Three probes (all using synthetic data r=0.95, seed increment):
+  P1 staged: Staged encoding (outer layer structure 12×10 + inner layer 10×8, λ=0) 8 seeds
+  P2 budget: Uniform encoding 6× budget (30×60, λ=0) 6 seeds
+  P3 fixed: Fixed architecture pure weight search (100×50, λ=0) h8 vs h32 5 seeds
+Output: output/s5_e3_parts/s5_e3_probes.csv"""
 import os
 import sys
 import time

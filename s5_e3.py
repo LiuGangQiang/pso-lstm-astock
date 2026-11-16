@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
-"""S5-E3：SNR 塌缩实验（"信号死亡"机制的判决性验证）。
+"""S5-E3: SNR Collapse Experiment (Decisive Validation of the "Signal Death" Mechanism).
 
-设计：合成数据植入已知结构信号——真实记忆长度 L=40（衰减核）+ 平滑非线性，
-信号强度旋钮 r = 结构化成分方差占比 ∈ {0.2,0.4,0.6,0.8,0.95}。
-用生产统一编码搜索（15×20，λ=0.1，子采样 600）在合成序列上选 (seq_len, hidden)。
+Design: Synthetic data with embedded known structured signals — true memory length L=40 (decaying kernel) + smoothed nonlinearity,
+Signal strength knob r = proportion of variance of structured component ∈ {0.2, 0.4, 0.6, 0.8, 0.95}.
+Use production-unified-encoding search (15×20, λ=0.1, subsampling 600) to select (seq_len, hidden) on the synthetic sequence.
 
-理论预测（信号死亡机制）：
-  - λ=0.1 时，低 r 下结构选择 100% 退化为最小架构 (s10, h8)；
-  - 随 r 上升，出现信号强度阈值 r*，超过后选择开始向大架构迁移；
-  - λ=0 对照组应在更低的 r 就跟随信号——两组阈值的错位即 SNR 塌缩的直接度量。
+Theoretical prediction (signal death mechanism):
+  - When λ = 0.1, at low r, the structure selection degenerates 100% to the smallest architecture (s10, h8);
+  - As r increases, a signal strength threshold r* appears, and once exceeded, the selection begins to shift toward a larger architecture;
+  - The λ=0 control group should follow the signal at a lower r — the misalignment of the thresholds between the two groups is a direct measure of SNR collapse.
 
-用法：
-  python s5_e3.py                     # 跑下一批（时间盒）
-  python s5_e3.py --r 0.6 --lam 0.1 --seed 0   # 单次测试
-"""
+Usage:
+  python s5_e3.py                     # Run the next batch (time budget)
+  python s5_e3.py --r 0.6 --lam 0.1 --seed 0   # Single test"""
 import argparse
 import os
 
@@ -33,11 +32,11 @@ TRUE_MEM = 40
 
 
 def gen_series(r: float, seed: int, mem: int = None) -> np.ndarray:
-    """植入结构信号的合成序列：L=40 衰减核记忆 + 平滑非线性 + 高斯噪声。
+    """Synthetic series with an implanted structural signal: L=40 decaying-kernel memory, smooth nonlinearity, and Gaussian noise.
 
-    z: AR(1) 潜过程（φ=0.98）；s_t = Σ w_k z_{t-k}（w 为归一化指数衰减核）；
-    y = √r·g(s) + √(1-r)·η，g(u)=u+0.4u²-0.2u³（平滑非线性使 hidden 容量有区分度）。
-    mem：植入记忆长度 L（默认 TRUE_MEM=40；对照实验传 20/60 改变植入结构）。
+    z: AR(1) latent process (φ=0.98); s_t = Σ w_k z_{t-k}, where w is a normalized exponential decay kernel.
+    y = √r·g(s) + √(1-r)·η, with g(u)=u+0.4u²-0.2u³; the smooth nonlinearity differentiates hidden-layer capacities.
+    mem: implanted memory length L (default TRUE_MEM=40; controls use 20/60 to alter the implanted structure).
     """
     L = TRUE_MEM if mem is None else int(mem)
     rng = np.random.default_rng(10_000 + seed)
@@ -76,7 +75,7 @@ def run_one(r: float, lam: float, seed: int) -> dict:
 
 def all_combos():
     combos = [(r, 0.1, seed) for r in RS for seed in SEEDS]
-    combos += [(r, 0.0, seed) for r in (0.6, 0.8, 0.95) for seed in SEEDS]  # λ=0 对照
+    combos += [(r, 0.0, seed) for r in (0.6, 0.8, 0.95) for seed in SEEDS]  # λ=0 control
     return combos
 
 
@@ -96,9 +95,9 @@ def main():
     if os.path.exists(CSV_PATH):
         df = pd.read_csv(CSV_PATH)
         done = set(zip(df.r, df.lam, df.seed))
-        print(f"已完成 {len(done)} 组，断点续跑")
+        print(f"Completed {len(done)}Set, resume from breakpoint")
     combos = [c for c in all_combos() if c not in done]
-    print(f"剩余 {len(combos)} 组")
+    print(f"Remaining {len(combos)}Group")
 
     import time
     t_start, rows = time.time(), []
@@ -115,7 +114,7 @@ def main():
     if rows:
         df = pd.DataFrame(rows)
         df.to_csv(CSV_PATH, mode="a", index=False, header=not os.path.exists(CSV_PATH))
-        print(f"本批完成 {len(rows)} 组 -> {CSV_PATH}")
+        print(f"Completed in this batch: {len(rows)}Group{CSV_PATH}")
 
 
 if __name__ == "__main__":

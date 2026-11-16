@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
-"""M3 / S2：联合编码偏置诊断实验（开题文档 V1.5 第五章 5.2）。
+"""M3 / S2: Joint Encoding Bias Diagnosis Experiment (Proposal Document V1.5, Chapter 5, Section 5.2).
 
-模型（两个，外加 s1v14 已有 APSO-LSTM 作固定架构对照）：
-  1. Unified-PSO   —— 朴素联合编码（架构段+权重段同粒子），V1.4 公平配置（λ=0.1 + 子采样600）
-  2. Staged-PSO    —— 分阶段联合编码（外层结构 PSO + 内层小型 APSO），V1.4 配置
+Models (two, plus the existing APSO-LSTM from s1v14 as a fixed architecture control):
+  1. Unified-PSO   —— Naive joint encoding (architecture segment + weight segment with the same particle), V1.4 fair configuration (λ=0.1 + sub-sampling 600)
+  2. Staged-PSO    —— Staged joint encoding (outer-layer structure PSO + inner-layer small APSO), V1.4 configuration
 
-设计（H3）：h ∈ {5, 10} 纯价格；12 标的 × 5 折 × 5 种子。
-每个 run 结束后用最佳粒子经 Adam 精调（40 epochs, lr=0.005）再评估，
-与 s1v14 的 APSO-LSTM 协议完全一致。
+Design (H3): h ∈ {5, 10} pure price; 12 stocks × 5 folds × 5 seeds.
+After each run, the best particle is fine-tuned using Adam (40 epochs, lr=0.005) and then re-evaluated,
+This is completely consistent with the APSO-LSTM protocol of s1v14.
 
-用法：
+Usage:
   python run_s2.py --stocks 600276 --horizons 10 --folds 0 --seeds 0,1,2
-  python s2_driver.py --start 0 --count 8
-"""
+  python s2_driver.py --start 0 --count 8"""
 import argparse
 import os
 import time
@@ -27,21 +26,21 @@ from select_stocks import CANDIDATES
 
 EPOCHS = 40
 PARTS_DIR = os.path.join("output", "s2_parts")
-# V1.4 公平配置
+# V1.4 Equitable Allocation
 WEIGHT_PENALTY = 0.1
 SUBSAMPLE = 600
-# 预算：统一编码沿用原型 15×20；分阶段外层 12×10 + 内层 10×8
+# Budget: Unified encoding follows the prototype 15×20; phased outer layer 12×10 + inner layer 10×8
 UNI_P, UNI_I = 15, 20
 OUT_P, OUT_I, IN_P, IN_I = 12, 10, 10, 8
 
 
 def run_model(model_name, close, code, tier, horizon, fold, seed):
-    """返回该模型在测试折上的指标行。"""
+    """Return a row of test-fold metrics for this model."""
     t0 = time.time()
 
     if model_name == "Unified-PSO":
-        # 结构搜索期 fitness 的序列长度由各粒子自己的结构段决定（默认窗口 20 仅用于
-        # 取训练段）；精调与评估数据在选定 s 后重建（V3.2 复核 c7 修复）。
+        # The sequence length of the fitness in the structural search period is determined by the structural segments of each particle themselves (the default window of 20 is only used for
+        # Take the training segment); Fine-tuning and evaluation data are reconstructed after selecting s (V3.2 review c7 fix).
         train_s, _, _, _, _, _ = prepare_fold(close, 20, horizon, fold)
         best_vec, fit, hist, decode = unified_pso_search(
             train_s, n_particles=UNI_P, iters=UNI_I, seed=seed, horizon=horizon,
@@ -56,7 +55,7 @@ def run_model(model_name, close, code, tier, horizon, fold, seed):
             inner_particles=IN_P, inner_iters=IN_I, weight_penalty=WEIGHT_PENALTY,
             fitness_subsample=SUBSAMPLE, verbose=False)
         s, h = decode(best_vec)
-        # 内层最优权重：重跑一次内层搜索拿到权重（确定性同种子），再注入
+        # Optimal inner-layer weights: Re-run the inner-layer search once to obtain the weights (deterministic with the same seed), then inject them.
         from pso_lstm import apso_weight_search
         wvec, _, _ = apso_weight_search(
             train_s, seq_len=s, hidden=h, n_particles=IN_P, iters=IN_I, seed=seed,
@@ -65,7 +64,7 @@ def run_model(model_name, close, code, tier, horizon, fold, seed):
         m = LSTMRegressor(hidden=h)
         m.set_vector(wvec)
 
-    # 按搜索选中的序列长度 s 重建精调/评估数据（c7：旧版恒用 20 日窗口）
+    # Reconstruct fine-tuning/evaluation data based on the selected sequence length s from the search (c7: legacy constant 20-day window)
     train_s, x_tr, y_tr, x_te, y_te, inv = prepare_fold(close, s, horizon, fold)
     actual = inv(y_te)
     train_model(m, x_tr, y_tr, epochs=EPOCHS, lr=0.005, seed=seed)
@@ -112,7 +111,7 @@ def main():
                     total += 1
                     print(f"[done] {args.stocks} +{horizon}d fold{fold} seed{seed} "
                           f"{model} {r['arch']} RMSE={r['RMSE']:.2f} {r['elapsed_s']}s", flush=True)
-    print(f"写入 {total} 行" if total else "无新增")
+    print(f"Write{total} row " if total else 'No new rows')
 
 
 if __name__ == "__main__":

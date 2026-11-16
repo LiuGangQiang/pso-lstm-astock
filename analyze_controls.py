@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""对照实验结果汇总分析。"""
+"""Summarize and analyze the control-experiment results."""
 import pandas as pd
 
 df = pd.read_csv('output/s5_e3_parts/s5_e3_controls.csv')
@@ -20,7 +20,7 @@ for name, g in df.groupby('control'):
     print('  init_seq_med median=%s  init_hid_med median=%s' % (g.init_seq_med.median(), g.init_hid_med.median()))
 print()
 
-print('== 主实验 std-init 对照 (lam=0.1) ==')
+print('== Main Experiment std-init Control (lam=0.1) ==')
 m = main[main.lam == 0.1]
 for r in [0.2, 0.6, 0.95]:
     g = m[m.r == r]

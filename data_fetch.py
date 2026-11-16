@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-"""从东方财富接口获取 A 股日线行情（无需 token），缓存为 CSV。
+"""Obtain A-share daily quotes from the East Money interface (no token required) and cache them as a CSV file.
 
-数据说明：
-- klt=101 日线；fqt=2 后复权（消除分红送股造成的价格断点，建模口径与论文 02 使用的
-  Yahoo Adj.Close 一致；如需预测真实交易价可改 fqt=0 不复权）。
-- 字段：date, open, close, high, low, volume, amount
-"""
+Data description:
+- klt=101 daily line; fqt=2 post-adjustment (eliminates price discontinuities caused by dividends and bonus shares; the modeling approach is consistent with the Yahoo Adj.Close used in Paper 02;
+  Yahoo Adj.Close; if you need to predict the actual trading price, you can change fqt=0 to no adjustment).
+- Fields: date, open, close, high, low, volume, amount"""
 import json
 import os
 import time
@@ -13,16 +12,16 @@ import urllib.request
 
 BASE = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 
-# 沪深 300 成分股中按波动率特征选取：低波动（白酒/银行）+ 高波动（创业板）
+# Selection based on volatility characteristics among CSI 300 constituents: Low volatility (liquor/banking) + High volatility (ChiNext)
 STOCKS = {
-    "600519": "贵州茅台",   # 低波动，消费
-    "600036": "招商银行",   # 低波动，银行
-    "300750": "宁德时代",   # 高波动，创业板（涨跌幅 ±20%）
+    "600519": 'Kweichow Moutai',   # Low volatility, consumption
+    "600036": 'China Merchants Bank',   # Low volatility, banks
+    "300750": 'CATL',   # High volatility, ChiNext (price change ±20%)
 }
 
 
 def market_prefix(code: str) -> str:
-    """沪市(6xxxxx) secid 前缀 1.，深市(0/3xxxxx)前缀 0.。"""
+    """Use secid prefix 1 for Shanghai (6xxxxx) and 0 for Shenzhen (0/3xxxxx)."""
     return "1" if code.startswith("6") else "0"
 
 
@@ -46,8 +45,8 @@ def fetch_daily(code: str, beg: str = "20150101", end: str = "20251231",
         for line in klines:
             # date,open,close,high,low,volume,amount
             f.write(line + "\n")
-    print(f"[fetch] {code} {STOCKS.get(code, '')}: {len(klines)} 条日线 -> {out}")
-    time.sleep(1)  # 温和限速
+    print(f"[fetch] {code} {STOCKS.get(code, '')}: {len(klines)}daily bars ->{out}")
+    time.sleep(1)  # Moderate speed limit
     return out
 
 

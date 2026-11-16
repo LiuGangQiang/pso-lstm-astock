@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-"""S3 前台主控：进程池并行跑全部组合，增量落盘、可反复中断续跑。
+"""S3 foreground master control: The process pool runs all combinations in parallel, with incremental writes to disk and the ability to repeatedly interrupt and resume running.
 
-每次 Bash 调用在前台运行本脚本（≤280s），超时被杀也不丢结果；
-再次调用自动跳过已完成组合。
+Each Bash call runs this script in the foreground (≤280s), and the results are not lost even if the process is terminated due to a timeout;
+The next time it is called, it will automatically skip the completed combinations.
 
-用法：python s3_master.py --workers 14 --budget 260
-"""
+Usage: python s3_master.py --workers 14 --budget 260"""
 import argparse
 import glob
 import os
@@ -18,7 +17,7 @@ from run_m1_baseline import POOL
 from run_s3 import (PARTS_DIR, build_features, run_fset)
 from select_stocks import CANDIDATES
 
-STOCKS = [c for tier in ("低波动", "中波动", "高波动") for c in POOL[tier]]
+STOCKS = [c for tier in ('low_volatility', 'medium_volatility', 'high_volatility') for c in POOL[tier]]
 HORIZONS = [1, 5, 20]
 FOLDS = [0, 1, 2, 3, 4]
 SEEDS = [0, 1, 2, 3, 4]
@@ -42,7 +41,7 @@ def _job(arg):
         feat_raw, close_raw = _data(code, fset)
         tiers = {c: t for t, codes in POOL.items() for c in codes}
         r = run_fset(fset, feat_raw, close_raw, code, tiers[code], horizon, fold, seed)
-        # 每 job 独立临时文件，避免多进程并发追加同一 CSV
+        # Separate temporary files for each job to avoid multiple processes concurrently appending to the same CSV file.
         tmp = os.path.join(PARTS_DIR, f"tmp_{code}_{fset}_h{horizon}_f{fold}_s{seed}.csv")
         pd.DataFrame([r]).to_csv(tmp, index=False, encoding="utf-8-sig")
         return f"[done] {code} +{horizon}d fold{fold} seed{seed} {r['model']} RMSE={r['RMSE']:.2f} {r['elapsed_s']}s"
@@ -51,7 +50,7 @@ def _job(arg):
 
 
 def merge_tmps():
-    """把 tmp_*.csv 折叠进 <stock>.csv（去重），返回折叠行数。"""
+    """Merge and deduplicate tmp_*.csv into <stock>.csv; return the number of merged rows."""
     tmps = glob.glob(os.path.join(PARTS_DIR, "tmp_*.csv"))
     if not tmps:
         return 0
@@ -74,7 +73,7 @@ def merge_tmps():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=14)
-    ap.add_argument("--budget", type=int, default=260, help="本轮最长秒数")
+    ap.add_argument("--budget", type=int, default=260, help='Maximum duration in this round (seconds)')
     args = ap.parse_args()
 
     os.makedirs(PARTS_DIR, exist_ok=True)
@@ -95,9 +94,9 @@ def main():
                     for fset in FSETS:
                         if (code, f"+{horizon}d", fold, seed, f"APSO-LSTM-{fset}") not in done:
                             jobs.append((code, fset, horizon, fold, seed))
-    print(f"待跑 {len(jobs)} 组，workers={args.workers}", flush=True)
+    print(f"Pending {len(jobs)}Group, workers={args.workers}", flush=True)
     if not jobs:
-        print("全部完成")
+        print('All Complete')
         return
 
     t0 = time.time()
@@ -112,10 +111,10 @@ def main():
             elif n % 25 == 0 or time.time() - t0 > args.budget:
                 print(msg, flush=True)
             if time.time() - t0 > args.budget:
-                print(f"[budget] 本轮 {n} 组（失败 {failed}），剩余 {len(jobs) - n} 组下次续跑", flush=True)
+                print(f"[Budget] This round{n}Group (Failed){failed}); remaining {len(jobs) - n}Group continues next time", flush=True)
                 ex.shutdown(wait=False, cancel_futures=True)
                 return
-    print(f"本轮完成 {n} 组（失败 {failed}）" + ("，全部结束" if n == len(jobs) and not failed else ""), flush=True)
+    print(f"Completed in this round: {n}Group (Failed){failed}）" + ('; all finished' if n == len(jobs) and not failed else ""), flush=True)
 
 
 if __name__ == "__main__":

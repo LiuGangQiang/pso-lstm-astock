@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""论文 V2 插图：英文标签（matplotlib 无 CJK 字形）。"""
+"""Figures for manuscript V2 with English labels (matplotlib has no CJK glyphs in this environment)."""
 import glob
 
 import matplotlib
@@ -37,8 +37,8 @@ fig.savefig(f"{OUT}/fig1_ratio_curve.png", dpi=200)
 plt.close(fig)
 
 # ---- Fig 2: feature ablation (S3) ----
-# V3.2 复核 c14/c23：聚合口径统一为「每股 (fold×seed) 均值 → 跨股中位数」，
-# 与正文 Table 3 一致；price 来自 s1，tech/sent 来自 s3。
+# V3.2 review c14/c23: aggregate as the mean over fold×seed within each stock, then the median across stocks;
+# Consistent with Table 3 in the main text; price comes from s1, tech/sent comes from s3.
 raw = pd.concat([pd.read_csv(p, dtype={"stock": str}) for p in glob.glob("output/s1v14_parts/*.csv")], ignore_index=True)
 s3raw = pd.concat([pd.read_csv(p, dtype={"stock": str}) for p in glob.glob("output/s3_parts/*.csv")], ignore_index=True)
 for _d in (raw, s3raw):
@@ -49,7 +49,7 @@ pb = pd.concat([pe.assign(seed=s) for s in range(5)], ignore_index=True)
 
 
 def stock_med_ratio(df, agg="mean"):
-    """每股 (fold×seed) 指定聚合 → 跨股中位数；返回按 horizon 的序列。"""
+    """Aggregate fold×seed values within each stock, then take the median across stocks; return a series indexed by horizon."""
     m = df.merge(pb[["stock", "horizon", "fold", "seed", "RMSE"]],
                  on=["stock", "horizon", "fold", "seed"], suffixes=("", "_per"))
     m["r"] = m.RMSE / m.RMSE_per
@@ -70,7 +70,7 @@ ax.set_xlabel("Forecast horizon")
 ax.set_ylabel("Median RMSE ratio vs Persistence")
 ax.axhline(1.0, color="#C00000", ls="--", lw=1.2)
 ax.legend(frameon=False)
-# V3.5（复核 c20）：原标题字面意思相反——特征从未提升精度（0/12 股，均值口径）
+# V3.5 (Review c20): The original title has the opposite literal meaning – the feature has never improved accuracy (0/12 stocks, average caliber).
 ax.set_title("Feature extensions improve accuracy in 0/12 stocks (S3)",
              fontsize=12.5)
 fig.tight_layout()
@@ -78,8 +78,8 @@ fig.savefig(f"{OUT}/fig2_features.png", dpi=200)
 plt.close(fig)
 
 # ---- Fig 3: encoding comparison (S2) ----
-# V3.2 复核 c0/c14：s2_results.csv 已为解码修正后的重跑结果；
-# 聚合口径统一为「每股 (fold×seed) 中位数 → 跨股中位数」。
+# V3.2 Review c0/c14: s2_results.csv is the rerun result after decoding correction;
+# Aggregate as the median over fold×seed within each stock, then the median across stocks.
 s2 = pd.read_csv("output/s2_results.csv", dtype={"stock": str})
 s2["stock"] = s2["stock"].str.zfill(6)
 s2["horizon"] = s2["horizon"].astype(str)
@@ -96,7 +96,7 @@ ax.set_xticks(x, ["+5d", "+10d"])
 ax.set_xlabel("Forecast horizon")
 ax.set_ylabel("Median RMSE ratio vs Persistence")
 ax.axhline(1.0, color="#C00000", ls="--", lw=1.2)
-# V3.5（复核 c21）：图例移到绘图区下方，避免压盖 +5d 柱
+# V3.5 (Review c21): Move the legend below the plot area to avoid overlapping with the +5d bar.
 ax.legend(frameon=False, fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.16))
 ax.set_title("Joint-encoding search trails the fixed architecture (S2)")
 fig.tight_layout()
@@ -128,15 +128,15 @@ for df, r, c in panels:
                   rotation=35 if dense else 0, ha="right" if dense else "center")
     ax.set_xlabel("\u03bb")
     if c == 0:
-        ax.set_ylabel("Penalty share (%)")  # V3.5 c22：缩短左轴标题
+        ax.set_ylabel("Penalty share (%)")  # V3.5 c22: Shorten the left axis title
     ax.grid(axis="y", color="0.9", lw=0.6)
     ax2 = ax.twinx()
     ax2.plot(xs, g["disp"], color="#C00000", lw=1.8, marker="s", ls="--")
     lo, hi = float(g["disp"].min()), float(g["disp"].max())
     span = hi - lo
     small = span < 0.02
-    # 小跨度时加大留白，让 3 个刻度充分分开（消除标签相叠）；
-    # 小跨度下弃用 hi 相对下限，否则 0.06·hi 会压扁刻度分布
+    # Increase the amount of white space when the range is small, so that the 3 tick marks are sufficiently separated (to eliminate overlapping labels);
+    # Discard the relative lower limit of hi for small spans, otherwise 0.06·hi will flatten the scale distribution.
     pad = max(span * (1.5 if small else 0.3), 1e-9) if small else max(span * 0.3, hi * 0.06, 1e-9)
     ax2.set_ylim(lo - pad, hi + pad)
     nd = 4 if small else 3
@@ -153,12 +153,12 @@ handles = [plt.Line2D([], [], color="#1F4E79", lw=2.2, marker="o", label="Penalt
            plt.Line2D([], [], color="#C00000", lw=1.8, marker="s", ls="--", label="Cross-seed RMSE-ratio SD (right axis)")]
 fig.legend(handles=handles, frameon=False, fontsize=9, loc="upper center",
            ncol=2, bbox_to_anchor=(0.55, 0.925))
-# V3.7（复核 c10）：中性标题，仅描述端点面板，不暗示等价
+# V3.7 (Review c10): Neutral title, describes only the endpoint panel, does not imply equivalence
 fig.suptitle("S5-E1: penalty share versus \u03bb (endpoints of four stock \u00d7 window panels)",
              fontsize=11)
 fig.text(0.55, 0.005, "\u03bb positions on the x-axis are categorical (levels are not evenly spaced)",
          ha="center", fontsize=8, color="0.35")
-# V3.5（复核 c22）：加大行距，避免面板标题与上图 x 轴标签相叠
+# V3.5 (Review c22): Increase line spacing to prevent the panel title from overlapping with the x-axis label in the figure above.
 fig.tight_layout(rect=[0.09, 0.03, 1, 0.95], h_pad=3.0)
 fig.savefig(f"{OUT}/fig4_penalty_panels.png", dpi=200)
 plt.close(fig)

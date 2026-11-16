@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""编辑清单第 5 项：E2 合成对照的多生成器种子复现（gen seed 1、2；seed 0 为原档）。
+"""Checklist item 5: replicate E2 synthetic controls across generator seeds 1 and 2; seed 0 is the original archive.
 
-原始 E2 主运行与 no_signal/mem 对照全部基于 gen_series(seed=0) 的单一生成序列。
-本脚本在生成器种子 1、2 上复现与原文相同口径的组合：
-  main:   r∈{0.2,0.4,0.6,0.8,0.95} × λ∈{0.0,0.1} × optseed 0..19（200/种子）
-  no_signal_std: r=0, λ=0.1, 20 optseeds（与 s5_e3_controls.py 口径一致）
-  mem20/mem60:   r=0.6, λ=0.1, mem=20/60, 20 optseeds
-合计 260 组/生成种子。优化种子保持 0..19 不变，只改变生成序列。
-广覆盖初始化与随机搜索对照探测的是搜索机制本身（与信号追踪无关），不在本复现范围。
+The original E2 main runs and no_signal/mem controls all used the single series gen_series(seed=0).
+This script reproduces the same combinations with generator seeds 1 and 2:
+  main: r∈{0.2,0.4,0.6,0.8,0.95} × λ∈{0.0,0.1} × optseed 0..19 (200 per generator seed)
+  no_signal_std: r=0, λ=0.1, 20 optseeds (matching s5_e3_controls.py)
+  mem20/mem60: r=0.6, λ=0.1, mem=20/60, 20 optseeds
+Total: 260 combinations per generator seed. Optimization seeds remain 0..19; only the generated series changes.
+Broad-initialization and random-search controls probe the search mechanism rather than signal tracking and are outside this replication.
 
-用法：python run_multiseed.py [块大小=60] [并发=6]
+Usage: python run_multiseed.py [chunk_size=60] [workers=6]
 """
 import os
 import sys
@@ -66,7 +66,7 @@ def main():
         df = pd.read_csv(CSV_PATH)
         done = set(zip(df.kind, df.genseed, df.r, df.lam, df.seed, df.mem))
     rem = [c for c in all_combos() if (c[0], c[1], c[2], c[3], c[4], c[5]) not in done]
-    print(f"剩余 {len(rem)} 组，本块取 {min(chunk, len(rem))} 组，{workers} 并发")
+    print(f"Remaining {len(rem)}Group, this block is taken{min(chunk, len(rem))}Group{workers}Concurrency")
     block = rem[:chunk]
     if not block:
         print("all done")
@@ -86,7 +86,7 @@ def main():
     df = pd.DataFrame(rows)
     df.to_csv(CSV_PATH, mode="a", index=False, header=not os.path.exists(CSV_PATH))
     ok = sum(1 for r_ in rows if "error" not in r_)
-    print(f"本块完成 {ok}/{len(rows)} 组，用时 {time.time()-t0:.0f}s -> {CSV_PATH}")
+    print(f"Chunk completed {ok}/{len(rows)}Set, time taken{time.time()-t0:.0f}s -> {CSV_PATH}")
 
 
 if __name__ == "__main__":

@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-"""S2 重跑驱动（V3.2 复核 c0/c7 修复后，2026-11-09）。
+"""S2 rerun driver (V3.2 review after c0/c7 fix, 11/09/2026).
 
-最小单元 = (stock, horizon, fold, seed)，各进程独立写
-output/s2_parts_run/<stock>_h<h>_f<f>_s<s>.csv，避免并发写冲突；
-全部完成后由 merge_s2_run.py 合并为规范 parts。
+Minimum unit = (stock, horizon, fold, seed), each process writes independently
+output/s2_parts_run/<stock>_h<h>_f<f>_s<s> .csv, to avoid concurrent write conflicts;
+Once everything is completed, merge_s2_run.py merges them into standard parts.
 
-用法：python s2_rerun.py --stock 600276 --horizon 5 --fold 0 --seed 0
-"""
+Usage: python s2_rerun.py --stock 600276 --horizon 5 --fold 0 --seed 0"""
 import argparse
 import os
 import sys
@@ -16,7 +15,7 @@ import pandas as pd
 import torch
 
 sys.path.insert(0, ".")
-torch.set_num_threads(1)  # 多进程并行，单线程避免 thrash
+torch.set_num_threads(1)  # Multiple processes run in parallel, and a single thread avoids thrashing
 
 from run_m1_baseline import POOL, load_series
 from run_s2 import run_model

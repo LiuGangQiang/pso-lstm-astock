@@ -1,28 +1,26 @@
 # -*- coding: utf-8 -*-
-"""M4 / S4：波动率分组统计检验（开题文档 V1.1 第五章 5.4，H4）。
+"""M4 / S4: Statistical test of volatility groupings (Proposal Document V1.1, Chapter 5, Section 5.4, H4).
 
-问题：APSO-LSTM 相对 Persistence 的优势（比值 RMSE_APSO / RMSE_Persist）
-是否随波动率层级（低/中/高）系统变化？（H4：层级间存在显著差异；
-开题预判"高波动层级 learning 模型相对占优"——S1 中 +1d 弱成立、+20d 三层重合。）
+Question: Does the advantage of APSO-LSTM over Persistence (ratio RMSE_APSO / RMSE_Persist)
+Does it change systematically with the volatility level (low/medium/high)? (H4: There are significant differences between the levels;
+The initial hypothesis was that "the learning model is relatively superior at the high volatility level" – in S1, +1d is weakly supported, and at +20d, the three levels coincide.)
 
-数据：
-- price 三级特征共用 s1v14 的 APSO-LSTM 与 Persistence 结果
-  （output/s1v14_parts/*.csv，含 h{1,3,5,10,20,40}，取 {1,5,20} 与 S3 对齐）；
-- tech/sent 的 Persistence 与 price 相同（Persistence 只用收盘价），
-  故分特征的三层比较直接用 s3_parts + s1v14 Persistence。
+Data:
+- Price three-level features share the APSO-LSTM and Persistence results of s1v14
+  (output/s1v14_parts/*.csv, containing h{1,3,5,10,20,40}, taking {1,5,20} to align with S3);
+- The Persistence of tech/sent is the same as that of price (Persistence only uses the closing price),
+  Therefore, the three-layer comparison of the sub-features directly uses s3_parts + s1v14 Persistence.
 
-统计设计：
-- 单元 = （标的, horizon, 特征集）；每个单元先对 5 折 × 5 种子共 25 次运行
-  的"同折同种子"比值取均值（比值层面聚合，保持配对）；
-- 层级间比较：Kruskal-Wallis H 检验（3 层级 × 每层级 4 标的，非正态小样本）；
-  事后两两 Mann-Whitney U（Bonferroni 校正 ×3）；
-- 层级内"是否优于 Persistence"：对 25 个配对比值做单样本 Wilcoxon（中位 vs 1）；
-- 效应量：层级中位比值、比值 < 1 的比例；
-- A50 子样本稳健性：12 只中属于中证 A50 的标的（名单见 A50 常量，
-  以 2024 年 12 月调样后名单为准）单独重跑上述检验。
+Statistical design:
+- Unit = (target, horizon, feature set); each unit is first run 25 times with 5-fold × 5 seeds.The mean of the "same fold, same seed" ratio is taken (aggregation at the ratio level, maintaining pairing);
+- Inter-level comparison: Kruskal-Wallis H test (3 levels × 4 stocks per tier, non-normal small sample);
+  Post-hoc pairwise Mann-Whitney U (Bonferroni correction ×3);
+- "Whether it is superior to Persistence" within the hierarchy: Perform a one-sample Wilcoxon test on the 25 paired odds ratios (median vs. 1);
+- Effect size: median odds ratio across levels, proportion of odds ratios < 1;
+- A50 sub-sample robustness: Of the 12 stocks, those belonging to the CSI A50 (see A50 constants for the list,
+  The above tests are rerun separately, based on the list after the December 2024 rebalancing).
 
-输出：output/s4_group_test.csv（检验结果汇总表）。
-"""
+Output: output/s4_group_test.csv (Summary table of test results)."""
 import glob
 import os
 
@@ -30,18 +28,18 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-TIERS = ["低波动", "中波动", "高波动"]
+TIERS = ['low_volatility', 'medium_volatility', 'high_volatility']
 HORIZONS = ["+1d", "+5d", "+20d"]
 FEATURES = ["price", "tech", "sent"]
 
-# 12 只标的中属于中证 A50 的（2024-12 调样后名单；非 A50 的不列出）
+# 12 stocks that are part of the CSI A50 (2024-12 post-rebalancing list; non-A50 stocks are not listed)
 A50 = {"600900", "600036", "600519", "600887", "000333", "600276",
        "688981", "300750", "300308"}
-# 注：三一重工(600031)、海康威视(002415)、阳光电源(300274)不在该期名单。
+# Note: Sany Heavy Industry (600031), Hikvision (002415), and Sungrow Power Supply (300274) are not on the list for this period.
 
 
 def load_price_rows():
-    """s1v14 的 APSO-LSTM 与 Persistence（h{1,5,20}）。"""
+    """APSO-LSTM and Persistence (h{1,5,20}) for s1v14."""
     frames = []
     for p in glob.glob(os.path.join("output", "s1v14_parts", "*.csv")):
         df = pd.read_csv(p, dtype={"stock": str})
@@ -50,7 +48,7 @@ def load_price_rows():
 
 
 def load_feature_rows():
-    """s3 的 APSO-LSTM-tech / -sent。"""
+    """APSO-LSTM-tech / -sent for s3."""
     frames = []
     for p in glob.glob(os.path.join("output", "s3_parts", "*.csv")):
         frames.append(pd.read_csv(p, dtype={"stock": str}))
@@ -58,11 +56,11 @@ def load_feature_rows():
 
 
 def paired_ratios(apso: pd.DataFrame, persist: pd.DataFrame, feature: str):
-    """按 (stock,horizon,fold,seed) 配对求 APSO/Persistence 的 RMSE 比值，
-    再对每个 (stock,horizon) 的 25 个比值取均值，返回长表。
+    """Compute paired APSO/Persistence RMSE ratios by (stock, horizon, fold, seed),
+    then average the 25 ratios for each (stock, horizon) and return a long-format table.
 
-    Persistence 与种子无关（run_m1_baseline 只在 seed 0 记录一行），
-    先按 apso 中出现的种子广播展开，保证 5 折 × 5 种子全部配对。"""
+    Persistence is seed-independent (run_m1_baseline records it only at seed 0),
+    so broadcast it across the seeds present for APSO to pair all 5 folds × 5 seeds."""
     seeds = sorted(apso.seed.unique())
     persist = persist[persist.model == "Persistence"]
     frames = []
@@ -82,7 +80,7 @@ def paired_ratios(apso: pd.DataFrame, persist: pd.DataFrame, feature: str):
 
 
 def kruskal_and_posthoc(groups: dict):
-    """groups: {tier: [ratios]} → (KW H, p)，及两两 MWU（Bonferroni）。"""
+    """groups: {tier: [ratios]} → (KW H, p), and pairwise MWU (Bonferroni)."""
     samples = [np.asarray(groups[t]) for t in TIERS if len(groups.get(t, []))]
     if len(samples) < 2:
         return None, []
@@ -110,22 +108,22 @@ def wilcoxon_vs_1(ratios):
 
 
 def run_tests(cell: pd.DataFrame, label: str, rows: list):
-    """cell: 某 (feature, horizon, 子样本) 的 (stock, tier, ratio) 表。"""
+    """Cell: The (stock, tier, ratio) table of a certain (feature, horizon, sub-sample)."""
     groups = {t: cell[cell.tier == t].ratio.values for t in TIERS}
     (H, p_kw), post = kruskal_and_posthoc(groups)
     med = {t: (float(np.median(groups[t])) if len(groups[t]) else np.nan) for t in TIERS}
-    rows.append(dict(analysis=label, test="Kruskal-Wallis(层级)", H=round(H, 4) if H else None,
-                     p=p_kw, 低波动中位=med["低波动"], 中波动中位=med["中波动"],
-                     高波动中位=med["高波动"], 详情="; ".join(
-                         f"{t}: n={len(groups[t])}, 中位={med[t]:.3f}" if len(groups[t]) else f"{t}: 空"
+    rows.append(dict(analysis=label, test='Kruskal-Wallis (Hierarchical)', H=round(H, 4) if H else None,
+                     p=p_kw, low_volatility_median=med['low_volatility'], medium_volatility_median=med['medium_volatility'],
+                     high_volatility_median=med['high_volatility'], details="; ".join(
+                         f"{t}: n={len(groups[t])}, median={med[t]:.3f}" if len(groups[t]) else f"{t}: empty"
                          for t in TIERS)))
     for t in TIERS:
         w, p = wilcoxon_vs_1(groups[t])
-        rows.append(dict(analysis=label, test=f"Wilcoxon(中位=1, {t})", W=w, p=p,
-                         低波动中位=med["低波动"], 中波动中位=med["中波动"], 高波动中位=med["高波动"]))
+        rows.append(dict(analysis=label, test=f"Wilcoxon (median=1, {t})", W=w, p=p,
+                         low_volatility_median=med['low_volatility'], medium_volatility_median=med['medium_volatility'], high_volatility_median=med['high_volatility']))
     for name, u, p in post:
         rows.append(dict(analysis=label, test=f"MWU Bonferroni({name})", U=u, p=p,
-                         低波动中位=med["低波动"], 中波动中位=med["中波动"], 高波动中位=med["高波动"]))
+                         low_volatility_median=med['low_volatility'], medium_volatility_median=med['medium_volatility'], high_volatility_median=med['high_volatility']))
 
 
 def main():
@@ -148,14 +146,14 @@ def main():
             cell = allcells[(allcells.feature == feature) & (allcells.horizon == h)]
             if not len(cell):
                 continue
-            run_tests(cell, f"{feature} {h} 全样本", rows)
+            run_tests(cell, f"{feature} {h} full sample", rows)
             a50cell = cell[cell.stock.isin(A50)]
             if len(a50cell) >= 6:
-                run_tests(a50cell, f"{feature} {h} A50子样本", rows)
+                run_tests(a50cell, f"{feature} {h} A50 subsample", rows)
     out = pd.DataFrame(rows)
     out.to_csv(os.path.join("output", "s4_group_test.csv"), index=False,
                encoding="utf-8-sig")
-    print(f"单元数 {len(allcells)}，检验行 {len(out)}")
+    print(f"Cells: {len(allcells)}; test rows: {len(out)}")
     print(out[out.test.str.startswith("Kruskal")].to_string(index=False))
 
 

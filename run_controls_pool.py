@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""对照实验并行驱动：ProcessPoolExecutor + 断点续跑，每次调用处理一块。
+"""Parallel driver for control experiments using ProcessPoolExecutor with checkpoint resume; each call processes one chunk.
 
-用法：python run_controls_pool.py [块大小=40] [并发=8]
+Usage: python run_controls_pool.py [chunk_size=40] [workers=8]
 """
 import os
 import sys
@@ -22,7 +22,7 @@ def main():
         df = pd.read_csv(CSV_PATH)
         done = set(zip(df.control, df.r, df.lam, df.seed))
     rem = [c for c in all_combos() if (c[0], c[1], c[2], c[3]) not in done]
-    print(f"剩余 {len(rem)} 组，本块取 {min(chunk, len(rem))} 组，{workers} 并发")
+    print(f"Remaining {len(rem)}Group, this block is taken{min(chunk, len(rem))}Group{workers}Concurrency")
     block = rem[:chunk]
 
     t0 = time.time()
@@ -40,7 +40,7 @@ def main():
         df = pd.DataFrame(rows)
         df.to_csv(CSV_PATH, mode="a", index=False, header=not os.path.exists(CSV_PATH))
     ok = sum(1 for r in rows if "error" not in r)
-    print(f"本块完成 {ok}/{len(rows)} 组，用时 {time.time()-t0:.0f}s -> {CSV_PATH}")
+    print(f"Chunk completed {ok}/{len(rows)}Set, time taken{time.time()-t0:.0f}s -> {CSV_PATH}")
 
 
 if __name__ == "__main__":

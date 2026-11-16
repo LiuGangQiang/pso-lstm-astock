@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-"""合并 S2 重跑的 600 个单元 csv（output/s2_parts_run/）为规范输出。
+"""Merge the 600 unit CSVs (output/s2_parts_run/) from the S2 rerun into a standardized output.
 
-产出：
-  output/s2_results.csv        —— 全量 1200 行（600 单元 × 2 模型）
-  output/s2_parts/<stock>.csv  —— 每股一个 part（与 run_s2.py 旧格式一致）
+Output:
+  output/s2_results.csv        —— Full 1200 rows (600 units × 2 models)
+  output/s2_parts/<stock>.csv  —— One part per unit (consistent with the old format of run_s2.py)
 
-2026-11-09，V3.2 复核 c0/c7 修复后的重跑结果。
-"""
+2026-11-09, V3.2 Review of the rerun results after the c0/c7 fix."""
 import glob
 import os
 
@@ -18,9 +17,9 @@ os.makedirs(PARTS_DIR, exist_ok=True)
 
 frames = [pd.read_csv(p) for p in sorted(glob.glob(os.path.join(OUT_DIR, "*.csv")))]
 df = pd.concat(frames, ignore_index=True)
-assert len(df) == 1200, f"期望 1200 行，实际 {len(df)}"
+assert len(df) == 1200, f"Expected 1200 rows; actual: {len(df)}"
 assert df.groupby(["stock", "horizon", "fold", "seed"]).size().eq(2).all(), \
-    "每个单元应有 Unified/Staged 两行"
+    'Each cell should contain two rows: Unified and Staged'
 
 df = df.sort_values(["stock", "horizon", "fold", "seed", "model"])
 df.to_csv("output/s2_results.csv", index=False)

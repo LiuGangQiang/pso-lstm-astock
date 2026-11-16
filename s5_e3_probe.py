@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""E3 判决探针：固定架构下 PSO 纯权重搜索能否兑现 h32 的容量优势。
+"""E3 Decision Probe: Under a fixed architecture, can PSO pure weight search deliver on the capacity advantages of h32?
 
-若 PSO(100x50, lam=0) 在 h32 上达不到 Adam 显示的 0.0036 量级，
-则"信号对整个 PSO 管线不可见"闭环；若能达到，失明严格发生在结构层。
-"""
+If PSO(100x50, lam=0) does not reach the 0.0036 magnitude shown by Adam on h32,
+then the closed loop "signal is not visible to the entire PSO pipeline"; if it can be achieved, the blindness occurs strictly at the structural level."""
 import sys
 sys.path.insert(0, ".")
 import numpy as np
@@ -21,4 +20,4 @@ for hid in (8, 32):
         n_particles=100, iters=50, seed=0, horizon=1, verbose=False,
         weight_penalty=0.0, fitness_subsample=600)
     print(f"fixed s10 h{hid}: PSO(100x50, lam=0) gbest MSE = {fit:.4f}")
-print("对照（Adam 30 epochs 诊断）: h8 ≈ 0.0176, h32 ≈ 0.0036")
+print('Control (Adam diagnostic with 30 epochs): h8 ≈ 0.0176, h32 ≈ 0.0036')
